@@ -9,40 +9,43 @@
 
 <style>
 body{margin:0;font-family:Arial;background:#eef2f5}
-header{background:#1f2937;color:#fff;padding:15px;text-align:center}
-nav{display:flex;background:#111827}
-nav button{flex:1;padding:14px;border:none;background:#111827;color:#fff;cursor:pointer}
+header{background:#1f2937;color:#fff;padding:12px;text-align:center}
+nav{display:flex;flex-wrap:wrap;background:#111827}
+nav button{flex:1;padding:12px;border:none;background:#111827;color:#fff}
 nav button:hover{background:#374151}
-.tab{display:none;padding:15px}
+.tab{display:none;padding:12px}
 input,select,button{padding:10px;margin:5px 0;width:100%;font-size:16px}
 table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{border:1px solid #ccc;padding:8px;white-space:nowrap}
+th,td{border:1px solid #ccc;padding:6px;white-space:nowrap}
 .action{color:blue;cursor:pointer;text-decoration:underline}
 .status{font-weight:bold}
-.status.EnRoute{color:orange}
-.status.Hooked{color:blue}
-.status.Completed{color:green}
-#map{height:400px}
+.EnRoute{color:orange}
+.Hooked{color:blue}
+.Completed{color:green}
+#map{height:50vh}
+@media(max-width:700px){
+nav button{font-size:14px}
+}
 </style>
 </head>
 
 <body>
 
-<header><h2>Towing Dispatch Dashboard</h2></header>
+<header><h3>🚨 Towing Dispatch Dashboard</h3></header>
 
 <nav>
 <button onclick="openTab('jobs')">Jobs</button>
 <button onclick="openTab('invoices')">Invoices</button>
-<button onclick="openTab('drivers')">Drivers</button>
 <button onclick="openTab('mapTab')">Map</button>
 </nav>
 
+<!-- JOBS -->
 <div id="jobs" class="tab">
 <h3>Add Job</h3>
+
 <form id="jobForm">
-<input id="phone" placeholder="Phone Number" required>
 <input id="customer" placeholder="Customer Name" required>
-<input id="vehicle" placeholder="Vehicle Info" required>
+<input id="phone" placeholder="Phone Number" required>
 <input id="driver" placeholder="Driver Name" required>
 
 <select id="status">
@@ -55,7 +58,7 @@ th,td{border:1px solid #ccc;padding:8px;white-space:nowrap}
 <input id="pickup" placeholder="Pickup Address" required>
 <input id="dropoff" placeholder="Dropoff Address" required>
 
-<button type="submit">Add Job</button>
+<button>Add Job</button>
 </form>
 
 <table>
@@ -69,26 +72,20 @@ th,td{border:1px solid #ccc;padding:8px;white-space:nowrap}
 </table>
 </div>
 
+<!-- INVOICES -->
 <div id="invoices" class="tab">
 <h3>Invoices</h3>
 <table>
 <thead>
-<tr><th>#</th><th>Driver</th><th>Status</th><th>Customer</th><th>Total</th><th>Print</th></tr>
+<tr><th>#</th><th>Customer</th><th>Driver</th><th>Total</th><th>Print</th></tr>
 </thead>
 <tbody id="invoiceTable"></tbody>
 </table>
 </div>
 
-<div id="drivers" class="tab">
-<h3>Driver Revenue</h3>
-<table>
-<thead><tr><th>Driver</th><th>Total Jobs</th><th>Total Revenue</th></tr></thead>
-<tbody id="driverTable"></tbody>
-</table>
-</div>
-
+<!-- MAP -->
 <div id="mapTab" class="tab">
-<h3>Live Job Map</h3>
+<h3>Job Locations</h3>
 <div id="map"></div>
 </div>
 
@@ -101,12 +98,14 @@ let jobs=[],markers=[];
 function openTab(id){
 document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
 document.getElementById(id).style.display='block';
-if(id==='mapTab')setTimeout(()=>map.invalidateSize(),200);
+if(id==="mapTab")setTimeout(()=>map.invalidateSize(),200);
 }
 openTab('jobs');
 
 const map=L.map('map').setView([39,-98],4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19,attribution:'© OpenStreetMap'
+}).addTo(map);
 
 async function geo(a){
 try{
@@ -126,20 +125,17 @@ return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
 
 jobForm.onsubmit=async e=>{
 e.preventDefault();
+
 let j={
-phone:phone.value,
 customer:customer.value,
-vehicle:vehicle.value,
+phone:phone.value,
 driver:driver.value,
-status:status.value,
-truckA:truck.value,
-pickA:pickup.value,
-dropA:dropoff.value
+status:status.value
 };
 
-j.truck=await geo(j.truckA);
-j.pick=await geo(j.pickA);
-j.drop=await geo(j.dropA);
+j.truck=await geo(truck.value);
+j.pick=await geo(pickup.value);
+j.drop=await geo(dropoff.value);
 
 j.miles=miles(j.truck,j.pick)+miles(j.pick,j.drop);
 j.total=BASE+(BASE*TAX)+(j.miles*RATE);
@@ -152,15 +148,10 @@ jobForm.reset();
 function render(){
 jobsTable.innerHTML="";
 invoiceTable.innerHTML="";
-driverTable.innerHTML="";
 markers.forEach(m=>map.removeLayer(m));
 markers=[];
 
-let drivers={};
-
 jobs.forEach((j,i)=>{
-drivers[j.driver]=(drivers[j.driver]||0)+j.total;
-
 jobsTable.innerHTML+=`
 <tr>
 <td>${j.driver}</td>
@@ -177,35 +168,40 @@ jobsTable.innerHTML+=`
 
 invoiceTable.innerHTML+=`
 <tr>
-<td>${i+1}</td><td>${j.driver}</td><td>${j.status}</td>
-<td>${j.customer}</td><td>$${j.total.toFixed(2)}</td>
+<td>${i+1}</td>
+<td>${j.customer}</td>
+<td>${j.driver}</td>
+<td>$${j.total.toFixed(2)}</td>
 <td><span class="action" onclick="printInv(${i})">Print</span></td>
 </tr>`;
 
-if(j.pick)markers.push(L.marker(j.pick).addTo(map).bindPopup(j.customer));
-});
-
-Object.keys(drivers).forEach(d=>{
-driverTable.innerHTML+=`
-<tr><td>${d}</td>
-<td>${jobs.filter(j=>j.driver===d).length}</td>
-<td>$${drivers[d].toFixed(2)}</td></tr>`;
+if(j.pick)markers.push(
+L.marker(j.pick).addTo(map).bindPopup(j.customer)
+);
 });
 }
 
-function del(i){if(confirm("Delete job?")){jobs.splice(i,1);render();}}
+function del(i){
+if(confirm("Delete job?")){
+jobs.splice(i,1);
+render();
+}
+}
 
 function edit(i){
 let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
-if(["EnRoute","Hooked","Completed"].includes(s))jobs[i].status=s;
+if(["EnRoute","Hooked","Completed"].includes(s)){
+jobs[i].status=s;
 render();
+}
 }
 
 function printInv(i){
 let j=jobs[i];
 let w=window.open("","_blank");
 w.document.write(`
-<!DOCTYPE html><html><head><title>Invoice</title></head>
+<!DOCTYPE html>
+<html><head><title>Invoice</title></head>
 <body style="font-family:Arial;padding:20px">
 <h2>Tow Invoice</h2>
 <p><b>Customer:</b> ${j.customer}</p>
