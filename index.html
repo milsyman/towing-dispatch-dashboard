@@ -63,12 +63,6 @@ th, td {border:1px solid #ccc; padding:6px; text-align:left; white-space:nowrap;
 <input id="phone" placeholder="Phone Number" required>
 <input id="driver" placeholder="Driver Name" required>
 
-<select id="status">
-<option value="EnRoute">En Route</option>
-<option value="Hooked">Hooked</option>
-<option value="Completed">Completed</option>
-</select>
-
 <input id="truck" placeholder="Truck Starting Address" required>
 <input id="pickup" placeholder="Pickup Address" required>
 <input id="dropoff" placeholder="Dropoff Address" required>
@@ -204,7 +198,7 @@ invoiceTable.innerHTML+=`
 <td>${j.id}</td>
 <td>${j.customer}</td>
 <td>${j.driver}</td>
-<td>${j.payment||"Unpaid"}</td>
+<td class="action" onclick="togglePayment(${i})">${j.payment||"Unpaid"}</td>
 <td>$${j.total.toFixed(2)}</td>
 <td><span class="action" onclick="printInv(${i})">Print</span></td>
 </tr>`;
@@ -227,7 +221,8 @@ e.preventDefault();
 let j={};
 j.id="JOB-"+(new Date()).getTime();
 j.customer=customer.value; j.phone=phone.value; j.driver=driver.value;
-j.status=status.value; j.priority=priority.value; j.towType=towType.value; j.callSource=callSource.value;
+j.status="EnRoute"; // default
+j.priority=priority.value; j.towType=towType.value; j.callSource=callSource.value;
 j.truck=await geo(truck.value); j.pick=await geo(pickup.value); j.drop=await geo(dropoff.value);
 j.miles=miles(j.truck,j.pick)+miles(j.pick,j.drop);
 j.total=BASE+(BASE*TAX)+(j.miles*RATE);
@@ -242,6 +237,12 @@ function del(i){if(confirm("Delete job?")){jobs.splice(i,1);render();}}
 function edit(i){
 let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
 if(["EnRoute","Hooked","Completed"].includes(s)) jobs[i].status=s; render();
+}
+
+/* --- TOGGLE PAYMENT STATUS --- */
+function togglePayment(i){
+jobs[i].payment = (jobs[i].payment==="Paid")?"Unpaid":"Paid";
+render();
 }
 
 /* --- PRINT INVOICE --- */
