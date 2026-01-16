@@ -32,56 +32,42 @@ nav button {
   color: white;
   cursor: pointer;
 }
-nav button:hover {
-  background: #374151;
-}
-.tab {
-  display: none;
-  padding: 15px;
-}
+nav button:hover { background: #374151; }
+
+.tab { display: none; padding: 15px; }
+
 input, select, button {
   padding: 10px;
   margin: 5px 0;
   width: 100%;
   font-size: 16px;
 }
+
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 15px;
-  overflow-x: auto;
 }
 th, td {
   border: 1px solid #ccc;
   padding: 8px;
-  text-align: left;
   white-space: nowrap;
 }
-.action {
-  color: blue;
-  cursor: pointer;
-  text-decoration: underline;
-}
-.status {
-  font-weight: bold;
-}
-.status.En\ Route { color: orange; }
+
+.action { color: blue; cursor: pointer; text-decoration: underline; }
+
+.status { font-weight: bold; }
+.status.EnRoute { color: orange; }
 .status.Hooked { color: blue; }
 .status.Completed { color: green; }
 
 #map { height: 400px; }
-
-@media (max-width: 700px) {
-  table { display: block; overflow-x: auto; }
-}
 </style>
 </head>
 
 <body>
 
-<header>
-  <h2>Towing Dispatch Dashboard</h2>
-</header>
+<header><h2>Towing Dispatch Dashboard</h2></header>
 
 <nav>
   <button onclick="openTab('jobs')">Jobs</button>
@@ -90,10 +76,8 @@ th, td {
   <button onclick="openTab('mapTab')">Map</button>
 </nav>
 
-<!-- JOBS -->
 <div id="jobs" class="tab">
 <h3>Add Job</h3>
-
 <form id="jobForm">
   <input id="phone" placeholder="Phone Number" required>
   <input id="customer" placeholder="Customer Name" required>
@@ -101,9 +85,9 @@ th, td {
   <input id="driver" placeholder="Driver Name" required>
 
   <select id="status">
-    <option>En Route</option>
-    <option>Hooked</option>
-    <option>Completed</option>
+    <option value="EnRoute">En Route</option>
+    <option value="Hooked">Hooked</option>
+    <option value="Completed">Completed</option>
   </select>
 
   <input id="truck" placeholder="Truck Starting Address" required>
@@ -116,53 +100,32 @@ th, td {
 <table>
 <thead>
 <tr>
-<th>Driver</th>
-<th>Status</th>
-<th>Customer</th>
-<th>Phone</th>
-<th>Miles</th>
-<th>Total</th>
-<th>Actions</th>
+<th>Driver</th><th>Status</th><th>Customer</th>
+<th>Phone</th><th>Miles</th><th>Total</th><th>Actions</th>
 </tr>
 </thead>
 <tbody id="jobsTable"></tbody>
 </table>
 </div>
 
-<!-- INVOICES -->
 <div id="invoices" class="tab">
 <h3>Invoices</h3>
 <table>
 <thead>
-<tr>
-<th>#</th>
-<th>Driver</th>
-<th>Status</th>
-<th>Customer</th>
-<th>Total</th>
-<th>Print</th>
-</tr>
+<tr><th>#</th><th>Driver</th><th>Status</th><th>Customer</th><th>Total</th><th>Print</th></tr>
 </thead>
 <tbody id="invoiceTable"></tbody>
 </table>
 </div>
 
-<!-- DRIVERS -->
 <div id="drivers" class="tab">
 <h3>Driver Revenue</h3>
 <table>
-<thead>
-<tr>
-<th>Driver</th>
-<th>Total Jobs</th>
-<th>Total Revenue</th>
-</tr>
-</thead>
+<thead><tr><th>Driver</th><th>Total Jobs</th><th>Total Revenue</th></tr></thead>
 <tbody id="driverTable"></tbody>
 </table>
 </div>
 
-<!-- MAP -->
 <div id="mapTab" class="tab">
 <h3>Live Job Map</h3>
 <div id="map"></div>
@@ -171,28 +134,30 @@ th, td {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-const BASE = 100;
-const TAX = 0.055;
-const RATE = 5;
-
-let jobs = [];
-let markers = [];
+const BASE = 100, TAX = 0.055, RATE = 5;
+let jobs = [], markers = [];
 
 function openTab(id){
   document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
   document.getElementById(id).style.display='block';
+  if(id==="mapTab") setTimeout(()=>map.invalidateSize(),200);
 }
 openTab('jobs');
 
-const map = L.map('map').setView([39,-98],4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const map = L.map('map',{zoomControl:true}).setView([39,-98],4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
 
 async function geo(a){
-  let r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`);
-  let d = await r.json();
-  return d.length?[+d[0].lat,+d[0].lon]:null;
+  try{
+    let r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`);
+    let d=await r.json();
+    return d.length?[+d[0].lat,+d[0].lon]:null;
+  }catch{ return null; }
 }
+
 function miles(a,b){
+  if(!a||!b) return 0;
   let R=3958.8,t=Math.PI/180;
   let dLat=(b[0]-a[0])*t,dLon=(b[1]-a[1])*t;
   let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;
@@ -253,32 +218,29 @@ jobsTable.innerHTML+=`
 
 invoiceTable.innerHTML+=`
 <tr>
-<td>${i+1}</td>
-<td>${j.driver}</td>
-<td>${j.status}</td>
-<td>${j.customer}</td>
-<td>$${j.total.toFixed(2)}</td>
+<td>${i+1}</td><td>${j.driver}</td><td>${j.status}</td>
+<td>${j.customer}</td><td>$${j.total.toFixed(2)}</td>
 <td><span class="action" onclick="printInv(${i})">Print</span></td>
 </tr>`;
 
+if(j.pick){
 markers.push(L.marker(j.pick).addTo(map).bindPopup(j.customer));
+}
 });
 
 Object.keys(drivers).forEach(d=>{
 driverTable.innerHTML+=`
-<tr>
-<td>${d}</td>
+<tr><td>${d}</td>
 <td>${jobs.filter(j=>j.driver===d).length}</td>
-<td>$${drivers[d].toFixed(2)}</td>
-</tr>`;
+<td>$${drivers[d].toFixed(2)}</td></tr>`;
 });
 }
 
 function del(i){ if(confirm("Delete job?")){ jobs.splice(i,1); render(); } }
 
 function edit(i){
-let j=jobs[i];
-j.status=prompt("Status",j.status);
+let s=prompt("Enter status: EnRoute / Hooked / Completed",jobs[i].status);
+if(["EnRoute","Hooked","Completed"].includes(s)) jobs[i].status=s;
 render();
 }
 
