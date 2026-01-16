@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Towing Dispatch Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+body { font-family: Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 0; }
+header { background: #2b3e50; color: white; padding: 20px; text-align: center; }
+nav { display: flex; justify-content: center; background: #1c2b38; }
+nav button { padding: 15px 25px; margin: 0; border: none; background: #1c2b38; color: white; cursor: pointer; font-size: 16px; transition: background 0.3s; }
+nav button:hover { background: #3a4f65; }
+.tab-content { display: none; padding: 20px; }
+table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+table, th, td { border: 1px solid #ccc; }
+th, td { padding: 10px; text-align: left; }
+input, button { padding: 8px; margin: 5px 0; }
+#map { height: 500px; width: 100%; margin-top: 15px; }
+#loading { display: none; padding: 10px; background: #ffd; border: 1px solid #ccc; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>Towing Dispatch Dashboard</h1>
+</header>
+
+<nav>
+<button onclick="openTab('jobs')">Jobs</button>
+<button onclick="openTab('revenue')">Revenue</button>
+<button onclick="openTab('invoices')">Invoices</button>
+<button onclick="openTab('map')">GPS Map</button>
+</nav>
+
+<div id="jobs" class="tab-content">
+<h2>Active Jobs</h2>
+<div id="loading">Geocoding addresses, please wait...</div>
+<form id="jobForm">
+<input type="text" id="customerName" placeholder="Customer Name" required>
+<input type="text" id="vehicleInfo" placeholder="Vehicle Info (Make/Model)" required>
+<input type="text" id="pickupAddress" placeholder="Pickup Address" required>
+<input type="text" id="dropoffAddress" placeholder="Dropoff Address" required>
+<button type="submit">Add Job</button>
+</form>
+<table id="jobsTable">
+<thead>
+<tr>
+<th>Customer</th>
+<th>Vehicle</th>
+<th>Pickup</th>
+<th>Dropoff</th>
+<th>Total ($)</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<div id="revenue" class="tab-content">
+<h2>Revenue Summary</h2>
+<p>Total Jobs: <span id="totalJobs">0</span></p>
+<p>Total Revenue: $<span id="totalRevenue">0.00</span></p>
+</div>
+
+<div id="invoices" class="tab-content">
+<h2>Invoices</h2>
+<table id="invoiceTable">
+<thead>
+<tr>
+<th>Invoice #</th>
+<th>Customer</th>
+<th>Vehicle</th>
+<th>Amount ($)</th>
+<th>Tax ($)</th>
+<th>Total ($)</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<div id="map" class="tab-content">
+<h2>GPS Map</h2>
+<div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const baseTow = 100;
+const taxRate = 0.055;
+let jobs = [];
+let invoiceCount = 1;
+let markers = [];
+
+function openTab(tabName) {
+document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+document.getElementById(tabName).style.display = 'block';
+}
+
+openTab('jobs'); // default
+
+// Initialize map immediately
+const map = L.map('map').setView([39.5, -98.35], 4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+maxZoom: 19,
+attribution: '© OpenStreetMap'
+}).addTo(map);
+
+async function geocode(address) {
+try {
+const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+const response = await fetch(url);
+const data = await response.json();
+if (data && data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+else { alert(`Address not found: ${address}`); return null; }
+} catch(err) {
+alert('Geocoding failed. Check your internet connection.');
+return null;
+}
+}
+
+// Add Job Form
+document.getElementById('jobForm').addEventListener('submit', async function(e){
+e.preventDefault();
+document.getElementById('loading').style.display = 'block'; // show loading
+const customer = document.getElementById('customerName').value;
+const vehicle = document.getElementById('vehicleInfo').value;
+const pickupAddress = document.getElementById('pickupAddress').value;
+const dropoffAddress = document.getElementById('dropoffAddress').value;
+
+const pickupCoords = await geocode(pickupAddress);
+const dropoffCoords = await geocode(dropoffAddress);
+
+document.getElementById('loading').style.display = 'none'; // hide loading
+
+if(!pickupCoords || !dropoffCoords) return;
+
+const tax = (baseTow * taxRate).toFixed(2);
+const total = (baseTow + parseFloat(tax)).toFixed(2);
+
+const job = {customer, vehicle, pickupAddress, dropoffAddress, total, pickupCoords, dropoffCoords};
+jobs.push(job);
+
+// Jobs Table
+const jobsTable = document.querySelector('#jobsTable tbody');
+const row = document.createElement('tr');
+row.innerHTML = `<td>${customer}</td><td>${vehicle}</td><td>${pickupAddress}</td><td>${dropoffAddress}</td><td>${total}</td>`;
+jobsTable.appendChild(row);
+
+// Invoice Table
+const invoiceTable = document.querySelector('#invoiceTable tbody');
+const invoiceRow = document.createElement('tr');
+invoiceRow.innerHTML = `<td>#${invoiceCount}</td><td>${customer}</td><td>${vehicle}</td><td>${baseTow.toFixed(2)}</td><td>${tax}</td><td>${total}</td>`;
+invoiceTable.appendChild(invoiceRow);
+invoiceCount++;
+
+// Update Revenue
+document.getElementById('totalJobs').textContent = jobs.length;
+const revenue = jobs.reduce((sum, job) => sum + parseFloat(job.total), 0);
+document.getElementById('totalRevenue').textContent = revenue.toFixed(2);
+
+// Add markers
+const pickupMarker = L.marker(pickupCoords).addTo(map).bindPopup(`<b>${customer}</b><br>Pickup`);
+const dropoffMarker = L.marker(dropoffCoords).addTo(map).bindPopup(`<b>${customer}</b><br>Dropoff`);
+markers.push(pickupMarker, dropoffMarker);
+
+// Auto-center and zoom map
+const group = new L.featureGroup(markers);
+map.fitBounds(group.getBounds().pad(0.2));
+
+this.reset();
+});
+</script>
+</body>
+</html>
