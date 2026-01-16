@@ -18,6 +18,7 @@ th, td { padding: 10px; text-align: left; }
 input, button { padding: 8px; margin: 5px 0; }
 #map { height: 500px; width: 100%; margin-top: 15px; }
 #loading { display: none; padding: 10px; background: #ffd; border: 1px solid #ccc; margin-bottom: 10px; }
+.action-btn { cursor: pointer; color: blue; text-decoration: underline; background: none; border: none; padding: 0; margin: 0; }
 </style>
 </head>
 <body>
@@ -35,7 +36,7 @@ input, button { padding: 8px; margin: 5px 0; }
 
 <div id="jobs" class="tab-content">
 <h2>Active Jobs</h2>
-<div id="loading">Geocoding addresses, please wait...</div>
+<div id="loading">Processing addresses, please wait...</div>
 <form id="jobForm">
 <input type="text" id="customerName" placeholder="Customer Name" required>
 <input type="text" id="vehicleInfo" placeholder="Vehicle Info (Make/Model)" required>
@@ -50,7 +51,9 @@ input, button { padding: 8px; margin: 5px 0; }
 <th>Vehicle</th>
 <th>Pickup</th>
 <th>Dropoff</th>
+<th>Miles</th>
 <th>Total ($)</th>
+<th>Actions</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -73,7 +76,9 @@ input, button { padding: 8px; margin: 5px 0; }
 <th>Vehicle</th>
 <th>Amount ($)</th>
 <th>Tax ($)</th>
+<th>Per Mile ($)</th>
 <th>Total ($)</th>
+<th>Actions</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -89,6 +94,7 @@ input, button { padding: 8px; margin: 5px 0; }
 <script>
 const baseTow = 100;
 const taxRate = 0.055;
+const perMileRate = 5;
 let jobs = [];
 let invoiceCount = 1;
 let markers = [];
@@ -97,33 +103,41 @@ function openTab(tabName) {
 document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
 document.getElementById(tabName).style.display = 'block';
 }
+openTab('jobs');
 
-openTab('jobs'); // default
-
-// Initialize map immediately
+// Initialize map
 const map = L.map('map').setView([39.5, -98.35], 4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 maxZoom: 19,
 attribution: '© OpenStreetMap'
 }).addTo(map);
 
+// Geocoding function
 async function geocode(address) {
 try {
 const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
 const response = await fetch(url);
 const data = await response.json();
-if (data && data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+if(data && data.length>0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
 else { alert(`Address not found: ${address}`); return null; }
-} catch(err) {
-alert('Geocoding failed. Check your internet connection.');
-return null;
+} catch(err) { alert('Geocoding failed'); return null; }
 }
+
+// Distance in miles using Haversine
+function distanceMiles(coord1, coord2){
+const R = 3958.8; // radius in miles
+const rad = Math.PI/180;
+const dLat = (coord2[0]-coord1[0])*rad;
+const dLon = (coord2[1]-coord1[1])*rad;
+const a = Math.sin(dLat/2)**2 + Math.cos(coord1[0]*rad)*Math.cos(coord2[0]*rad)*Math.sin(dLon/2)**2;
+const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+return R*c;
 }
 
 // Add Job Form
 document.getElementById('jobForm').addEventListener('submit', async function(e){
 e.preventDefault();
-document.getElementById('loading').style.display = 'block'; // show loading
+document.getElementById('loading').style.display='block';
 const customer = document.getElementById('customerName').value;
 const vehicle = document.getElementById('vehicleInfo').value;
 const pickupAddress = document.getElementById('pickupAddress').value;
@@ -131,46 +145,137 @@ const dropoffAddress = document.getElementById('dropoffAddress').value;
 
 const pickupCoords = await geocode(pickupAddress);
 const dropoffCoords = await geocode(dropoffAddress);
-
-document.getElementById('loading').style.display = 'none'; // hide loading
-
+document.getElementById('loading').style.display='none';
 if(!pickupCoords || !dropoffCoords) return;
 
-const tax = (baseTow * taxRate).toFixed(2);
-const total = (baseTow + parseFloat(tax)).toFixed(2);
+const miles = distanceMiles(pickupCoords, dropoffCoords).toFixed(1);
+const perMileCharge = (miles*perMileRate).toFixed(2);
+const tax = (baseTow*taxRate).toFixed(2);
+const total = (baseTow + parseFloat(tax) + parseFloat(perMileCharge)).toFixed(2);
 
-const job = {customer, vehicle, pickupAddress, dropoffAddress, total, pickupCoords, dropoffCoords};
+const job = {customer, vehicle, pickupAddress, dropoffAddress, pickupCoords, dropoffCoords, miles, perMileCharge, tax, total};
 jobs.push(job);
 
-// Jobs Table
-const jobsTable = document.querySelector('#jobsTable tbody');
-const row = document.createElement('tr');
-row.innerHTML = `<td>${customer}</td><td>${vehicle}</td><td>${pickupAddress}</td><td>${dropoffAddress}</td><td>${total}</td>`;
-jobsTable.appendChild(row);
-
-// Invoice Table
-const invoiceTable = document.querySelector('#invoiceTable tbody');
-const invoiceRow = document.createElement('tr');
-invoiceRow.innerHTML = `<td>#${invoiceCount}</td><td>${customer}</td><td>${vehicle}</td><td>${baseTow.toFixed(2)}</td><td>${tax}</td><td>${total}</td>`;
-invoiceTable.appendChild(invoiceRow);
-invoiceCount++;
-
-// Update Revenue
-document.getElementById('totalJobs').textContent = jobs.length;
-const revenue = jobs.reduce((sum, job) => sum + parseFloat(job.total), 0);
-document.getElementById('totalRevenue').textContent = revenue.toFixed(2);
+// Update Jobs Table
+updateJobsTable();
+updateInvoicesTable();
+updateRevenue();
 
 // Add markers
 const pickupMarker = L.marker(pickupCoords).addTo(map).bindPopup(`<b>${customer}</b><br>Pickup`);
 const dropoffMarker = L.marker(dropoffCoords).addTo(map).bindPopup(`<b>${customer}</b><br>Dropoff`);
 markers.push(pickupMarker, dropoffMarker);
+fitMap();
 
-// Auto-center and zoom map
-const group = new L.featureGroup(markers);
-map.fitBounds(group.getBounds().pad(0.2));
-
+// Reset form
 this.reset();
 });
+
+// Update Jobs Table
+function updateJobsTable(){
+const tbody = document.querySelector('#jobsTable tbody');
+tbody.innerHTML='';
+jobs.forEach((job,i)=>{
+const row = document.createElement('tr');
+row.innerHTML = `<td>${job.customer}</td>
+<td>${job.vehicle}</td>
+<td>${job.pickupAddress}</td>
+<td>${job.dropoffAddress}</td>
+<td>${job.miles}</td>
+<td>${job.total}</td>
+<td>
+<button class="action-btn" onclick="editJob(${i})">Edit</button> |
+<button class="action-btn" onclick="deleteJob(${i})">Delete</button>
+</td>`;
+tbody.appendChild(row);
+});
+
+// Update Map Markers
+markers.forEach(m=>map.removeLayer(m));
+markers=[];
+jobs.forEach(job=>{
+const p = L.marker(job.pickupCoords).addTo(map).bindPopup(`<b>${job.customer}</b><br>Pickup`);
+const d = L.marker(job.dropoffCoords).addTo(map).bindPopup(`<b>${job.customer}</b><br>Dropoff`);
+markers.push(p,d);
+});
+fitMap();
+}
+
+// Update Invoices Table
+function updateInvoicesTable(){
+const tbody = document.querySelector('#invoiceTable tbody');
+tbody.innerHTML='';
+jobs.forEach((job,i)=>{
+const row = document.createElement('tr');
+row.innerHTML = `<td>#${i+1}</td>
+<td>${job.customer}</td>
+<td>${job.vehicle}</td>
+<td>${baseTow.toFixed(2)}</td>
+<td>${job.tax}</td>
+<td>${job.perMileCharge}</td>
+<td>${job.total}</td>
+<td>
+<button class="action-btn" onclick="editJob(${i})">Edit</button> |
+<button class="action-btn" onclick="deleteJob(${i})">Delete</button>
+</td>`;
+tbody.appendChild(row);
+});
+}
+
+// Edit Job
+async function editJob(i){
+const job = jobs[i];
+const newCustomer = prompt("Customer Name:", job.customer);
+if(newCustomer===null) return;
+const newVehicle = prompt("Vehicle Info:", job.vehicle);
+if(newVehicle===null) return;
+const newPickup = prompt("Pickup Address:", job.pickupAddress);
+if(newPickup===null) return;
+const newDropoff = prompt("Dropoff Address:", job.dropoffAddress);
+if(newDropoff===null) return;
+
+document.getElementById('loading').style.display='block';
+const pickupCoords = await geocode(newPickup);
+const dropoffCoords = await geocode(newDropoff);
+document.getElementById('loading').style.display='none';
+if(!pickupCoords || !dropoffCoords) return;
+
+const miles = distanceMiles(pickupCoords, dropoffCoords).toFixed(1);
+const perMileCharge = (miles*perMileRate).toFixed(2);
+const tax = (baseTow*taxRate).toFixed(2);
+const total = (baseTow + parseFloat(tax) + parseFloat(perMileCharge)).toFixed(2);
+
+jobs[i]={customer:newCustomer,vehicle:newVehicle,pickupAddress:newPickup,dropoffAddress:newDropoff,
+pickupCoords,dropoffCoords,miles,perMileCharge,tax,total};
+
+updateJobsTable();
+updateInvoicesTable();
+updateRevenue();
+}
+
+// Delete Job
+function deleteJob(i){
+if(!confirm("Delete this job?")) return;
+jobs.splice(i,1);
+updateJobsTable();
+updateInvoicesTable();
+updateRevenue();
+}
+
+// Update Revenue
+function updateRevenue(){
+document.getElementById('totalJobs').textContent=jobs.length;
+const revenue = jobs.reduce((sum,job)=>sum + parseFloat(job.total),0);
+document.getElementById('totalRevenue').textContent=revenue.toFixed(2);
+}
+
+// Fit Map
+function fitMap(){
+if(markers.length>0){
+const group = new L.featureGroup(markers);
+map.fitBounds(group.getBounds().pad(0.2));
+}
+}
 </script>
 </body>
 </html>
