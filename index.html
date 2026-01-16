@@ -3,40 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Warren Towing Dispatch</title>
+<title>M&S Towing Dispatch</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
 /* --- General --- */
-body{margin:0;font-family:Arial;background:#f4f6f8}
-header{background:#1f2937;color:#fff;padding:12px;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
-header h1{margin:0;font-size:1.5rem}
-header p{margin:2px;font-size:0.9rem;color:#d1d5db}
-nav{display:flex;flex-wrap:wrap;background:#111827}
-nav button{flex:1;padding:12px;border:none;background:#111827;color:white;cursor:pointer}
-nav button:hover{background:#374151}
-.tab{display:none;padding:15px}
-input,select,button{padding:10px;margin:5px 0;width:100%;font-size:16px;box-sizing:border-box}
-button{cursor:pointer}
-table{width:100%;border-collapse:collapse;margin-top:15px}
-th,td{border:1px solid #ccc;padding:6px;text-align:left;white-space:nowrap}
-.action{color:#2563eb;cursor:pointer;text-decoration:underline}
-.status{font-weight:bold}
-.EnRoute{color:#f97316} /* orange */
-.Hooked{color:#3b82f6} /* blue */
-.Completed{color:#16a34a} /* green */
-#map{height:50vh;margin-top:10px;border:1px solid #ccc;border-radius:6px}
-@media(max-width:700px){nav button{font-size:14px}}
-.card{background:white;padding:15px;margin:10px 0;border-radius:6px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}
+body {margin:0; font-family:Arial, sans-serif; background:#f4f6f8;}
+header {background:#1f2937; color:white; padding:12px; box-shadow:0 2px 4px rgba(0,0,0,0.2);}
+header h1 {margin:0; font-size:1.5rem;}
+header p {margin:2px; font-size:0.9rem; color:#d1d5db;}
+nav {display:flex; flex-wrap:wrap; background:#111827;}
+nav button {flex:1; padding:12px; border:none; background:#111827; color:white; cursor:pointer;}
+nav button:hover {background:#374151;}
+.tab {display:none; padding:15px;}
+input, select, button {padding:10px; margin:5px 0; width:100%; font-size:16px; box-sizing:border-box;}
+button {cursor:pointer; background:#2563eb; color:white; border:none; border-radius:4px;}
+button:hover {background:#1e40af;}
+table {width:100%; border-collapse:collapse; margin-top:10px;}
+th, td {border:1px solid #ccc; padding:6px; text-align:left; white-space:nowrap;}
+.status {font-weight:bold; padding:2px 6px; border-radius:4px; color:white;}
+.status.EnRoute {background:#f97316;}
+.status.Hooked {background:#3b82f6;}
+.status.Completed {background:#16a34a;}
+.badge {padding:2px 6px; border-radius:4px; color:white; font-size:0.85rem;}
+.badge.Normal {background:#6b7280;}
+.badge.Urgent {background:#ef4444;}
+.badge.Police {background:#2563eb;}
+.badge.Accident {background:#f59e0b;}
+.badge.Impound {background:#6d28d9;}
+.badge.Breakdown {background:#10b981;}
+.badge.Repo {background:#f97316;}
+.badge.Jumpstart {background:#3b82f6;}
+#map {height:50vh; margin-top:10px; border:1px solid #ccc; border-radius:6px;}
+.card {background:white; padding:15px; margin:10px 0; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
+.action {color:#2563eb; cursor:pointer; text-decoration:underline;}
+@media(max-width:700px){nav button{font-size:14px;}}
 </style>
 </head>
 
 <body>
 
 <header>
-<h1>Warren Towing & Recovery</h1>
-<p>📞 (555) 555-5555 | ✉ dispatch@company.com</p>
+<h1>M&S Towing</h1>
+<p>📞 608‑339‑1981 | ✉ dispatch@ms-towing.com</p>
 </header>
 
 <nav>
@@ -52,20 +62,24 @@ th,td{border:1px solid #ccc;padding:6px;text-align:left;white-space:nowrap}
 <input id="customer" placeholder="Customer Name" required>
 <input id="phone" placeholder="Phone Number" required>
 <input id="driver" placeholder="Driver Name" required>
+
 <select id="status">
 <option value="EnRoute">En Route</option>
 <option value="Hooked">Hooked</option>
 <option value="Completed">Completed</option>
 </select>
+
 <input id="truck" placeholder="Truck Starting Address" required>
 <input id="pickup" placeholder="Pickup Address" required>
 <input id="dropoff" placeholder="Dropoff Address" required>
+
 <select id="priority">
 <option value="Normal">Normal</option>
 <option value="Urgent">Urgent</option>
 <option value="Police">Police</option>
 <option value="Accident">Accident</option>
 </select>
+
 <select id="towType">
 <option value="Impound">Impound</option>
 <option value="Breakdown">Breakdown</option>
@@ -73,6 +87,7 @@ th,td{border:1px solid #ccc;padding:6px;text-align:left;white-space:nowrap}
 <option value="Repo">Repo</option>
 <option value="Jumpstart">Jumpstart</option>
 </select>
+
 <select id="callSource">
 <option value="Private">Private</option>
 <option value="Police">Police</option>
@@ -80,13 +95,23 @@ th,td{border:1px solid #ccc;padding:6px;text-align:left;white-space:nowrap}
 <option value="AAA">AAA</option>
 <option value="Roadside">Roadside</option>
 </select>
+
 <button>Add Job</button>
 </form>
 
 <h3>Current Jobs</h3>
 <table>
 <thead>
-<tr><th>Job #</th><th>Driver</th><th>Status</th><th>Customer</th><th>Phone</th><th>Miles</th><th>Total</th><th>Actions</th></tr>
+<tr>
+<th>Job #</th>
+<th>Driver</th>
+<th>Status</th>
+<th>Customer</th>
+<th>Phone</th>
+<th>Miles</th>
+<th>Total</th>
+<th>Actions</th>
+</tr>
 </thead>
 <tbody id="jobsTable"></tbody>
 </table>
@@ -97,7 +122,14 @@ th,td{border:1px solid #ccc;padding:6px;text-align:left;white-space:nowrap}
 <h3>Invoices</h3>
 <table>
 <thead>
-<tr><th>#</th><th>Customer</th><th>Driver</th><th>Payment Status</th><th>Total</th><th>Print</th></tr>
+<tr>
+<th>#</th>
+<th>Customer</th>
+<th>Driver</th>
+<th>Payment Status</th>
+<th>Total</th>
+<th>Print</th>
+</tr>
 </thead>
 <tbody id="invoiceTable"></tbody>
 </table>
@@ -112,43 +144,44 @@ th,td{border:1px solid #ccc;padding:6px;text-align:left;white-space:nowrap}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-/* --- SETTINGS --- */
 const BASE=100,TAX=0.055,RATE=5;
-let jobs=[],markers=[];
+let jobs=[], markers=[];
 
 /* --- LOCAL STORAGE --- */
-function saveData(){localStorage.setItem('towJobs',JSON.stringify(jobs))}
-function loadData(){let d=localStorage.getItem('towJobs');if(d)jobs=JSON.parse(d)}
+function saveData(){localStorage.setItem('towJobs', JSON.stringify(jobs))}
+function loadData(){let d=localStorage.getItem('towJobs'); if(d) jobs=JSON.parse(d)}
 
 /* --- TAB FUNCTION --- */
 function openTab(id){
 document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
 document.getElementById(id).style.display='block';
-if(id==="mapTab")setTimeout(()=>map.invalidateSize(),200);
+if(id==="mapTab") setTimeout(()=>map.invalidateSize(),200);
 }
 openTab('jobs');
 
-/* --- MAP SETUP --- */
+/* --- MAP --- */
 const map=L.map('map').setView([39,-98],4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
 
 /* --- GEOCODING --- */
 async function geo(a){
 try{let r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`);
-let d=await r.json();return d.length?[+d[0].lat,+d[0].lon]:null}catch{return null;}
+let d=await r.json(); return d.length?[+d[0].lat,+d[0].lon]:null}catch{return null;}
 }
 
 /* --- DISTANCE CALC --- */
-function miles(a,b){if(!a||!b)return 0;let R=3958.8,t=Math.PI/180;let dLat=(b[0]-a[0])*t,dLon=(b[1]-a[1])*t;
-let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));}
+function miles(a,b){if(!a||!b) return 0; let R=3958.8, t=Math.PI/180;
+let dLat=(b[0]-a[0])*t,dLon=(b[1]-a[1])*t;
+let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;
+return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));}
 
 /* --- LOAD DATA --- */
 loadData();
 
-/* --- RENDER --- */
+/* --- RENDER FUNCTION --- */
 function render(){
-jobsTable.innerHTML="";invoiceTable.innerHTML="";
-markers.forEach(m=>map.removeLayer(m));markers=[];
+jobsTable.innerHTML=""; invoiceTable.innerHTML="";
+markers.forEach(m=>map.removeLayer(m)); markers=[];
 
 jobs.forEach((j,i)=>{
 jobsTable.innerHTML+=`
@@ -177,7 +210,13 @@ invoiceTable.innerHTML+=`
 </tr>`;
 
 /* --- MAP MARKERS --- */
-if(j.pick)markers.push(L.marker(j.pick).addTo(map).bindPopup(`${j.customer}<br>Driver: ${j.driver}`));
+if(j.pick) markers.push(L.marker(j.pick).addTo(map).bindPopup(`
+<b>${j.customer}</b><br>
+Driver: ${j.driver}<br>
+Job #: ${j.id}<br>
+Type: ${j.towType}<br>
+Priority: ${j.priority}
+`));
 });
 saveData();
 }
@@ -187,13 +226,13 @@ jobForm.onsubmit=async e=>{
 e.preventDefault();
 let j={};
 j.id="JOB-"+(new Date()).getTime();
-j.customer=customer.value;j.phone=phone.value;j.driver=driver.value;
-j.status=status.value;j.priority=priority.value;j.towType=towType.value;j.callSource=callSource.value;
-j.truck=await geo(truck.value);j.pick=await geo(pickup.value);j.drop=await geo(dropoff.value);
+j.customer=customer.value; j.phone=phone.value; j.driver=driver.value;
+j.status=status.value; j.priority=priority.value; j.towType=towType.value; j.callSource=callSource.value;
+j.truck=await geo(truck.value); j.pick=await geo(pickup.value); j.drop=await geo(dropoff.value);
 j.miles=miles(j.truck,j.pick)+miles(j.pick,j.drop);
 j.total=BASE+(BASE*TAX)+(j.miles*RATE);
 j.payment="Unpaid";
-jobs.push(j);render();jobForm.reset();
+jobs.push(j); render(); jobForm.reset();
 }
 
 /* --- DELETE JOB --- */
@@ -202,7 +241,7 @@ function del(i){if(confirm("Delete job?")){jobs.splice(i,1);render();}}
 /* --- EDIT JOB STATUS --- */
 function edit(i){
 let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
-if(["EnRoute","Hooked","Completed"].includes(s))jobs[i].status=s;render();
+if(["EnRoute","Hooked","Completed"].includes(s)) jobs[i].status=s; render();
 }
 
 /* --- PRINT INVOICE --- */
@@ -218,11 +257,13 @@ w.document.write(`
 <p><b>Phone:</b> ${j.phone}</p>
 <p><b>Driver:</b> ${j.driver}</p>
 <p><b>Status:</b> ${j.status}</p>
+<p><b>Priority:</b> ${j.priority}</p>
+<p><b>Tow Type:</b> ${j.towType}</p>
 <p><b>Miles:</b> ${j.miles.toFixed(1)}</p>
 <h3>Total: $${j.total.toFixed(2)}</h3>
 <p><i>Rates subject to local regulations. Vehicle released upon payment. Storage fees may apply.</i></p>
 </body></html>`);
-w.document.close();w.onload=()=>w.print();
+w.document.close(); w.onload=()=>w.print();
 }
 
 /* --- INITIAL RENDER --- */
