@@ -8,60 +8,21 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #eef2f5;
-}
-header {
-  background: #1f2937;
-  color: white;
-  padding: 15px;
-  text-align: center;
-}
-nav {
-  display: flex;
-  flex-wrap: wrap;
-  background: #111827;
-}
-nav button {
-  flex: 1;
-  padding: 14px;
-  border: none;
-  background: #111827;
-  color: white;
-  cursor: pointer;
-}
-nav button:hover { background: #374151; }
-
-.tab { display: none; padding: 15px; }
-
-input, select, button {
-  padding: 10px;
-  margin: 5px 0;
-  width: 100%;
-  font-size: 16px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 15px;
-}
-th, td {
-  border: 1px solid #ccc;
-  padding: 8px;
-  white-space: nowrap;
-}
-
-.action { color: blue; cursor: pointer; text-decoration: underline; }
-
-.status { font-weight: bold; }
-.status.EnRoute { color: orange; }
-.status.Hooked { color: blue; }
-.status.Completed { color: green; }
-
-#map { height: 400px; }
+body{margin:0;font-family:Arial;background:#eef2f5}
+header{background:#1f2937;color:#fff;padding:15px;text-align:center}
+nav{display:flex;background:#111827}
+nav button{flex:1;padding:14px;border:none;background:#111827;color:#fff;cursor:pointer}
+nav button:hover{background:#374151}
+.tab{display:none;padding:15px}
+input,select,button{padding:10px;margin:5px 0;width:100%;font-size:16px}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #ccc;padding:8px;white-space:nowrap}
+.action{color:blue;cursor:pointer;text-decoration:underline}
+.status{font-weight:bold}
+.status.EnRoute{color:orange}
+.status.Hooked{color:blue}
+.status.Completed{color:green}
+#map{height:400px}
 </style>
 </head>
 
@@ -70,31 +31,31 @@ th, td {
 <header><h2>Towing Dispatch Dashboard</h2></header>
 
 <nav>
-  <button onclick="openTab('jobs')">Jobs</button>
-  <button onclick="openTab('invoices')">Invoices</button>
-  <button onclick="openTab('drivers')">Drivers</button>
-  <button onclick="openTab('mapTab')">Map</button>
+<button onclick="openTab('jobs')">Jobs</button>
+<button onclick="openTab('invoices')">Invoices</button>
+<button onclick="openTab('drivers')">Drivers</button>
+<button onclick="openTab('mapTab')">Map</button>
 </nav>
 
 <div id="jobs" class="tab">
 <h3>Add Job</h3>
 <form id="jobForm">
-  <input id="phone" placeholder="Phone Number" required>
-  <input id="customer" placeholder="Customer Name" required>
-  <input id="vehicle" placeholder="Vehicle Info" required>
-  <input id="driver" placeholder="Driver Name" required>
+<input id="phone" placeholder="Phone Number" required>
+<input id="customer" placeholder="Customer Name" required>
+<input id="vehicle" placeholder="Vehicle Info" required>
+<input id="driver" placeholder="Driver Name" required>
 
-  <select id="status">
-    <option value="EnRoute">En Route</option>
-    <option value="Hooked">Hooked</option>
-    <option value="Completed">Completed</option>
-  </select>
+<select id="status">
+<option value="EnRoute">En Route</option>
+<option value="Hooked">Hooked</option>
+<option value="Completed">Completed</option>
+</select>
 
-  <input id="truck" placeholder="Truck Starting Address" required>
-  <input id="pickup" placeholder="Pickup Address" required>
-  <input id="dropoff" placeholder="Dropoff Address" required>
+<input id="truck" placeholder="Truck Starting Address" required>
+<input id="pickup" placeholder="Pickup Address" required>
+<input id="dropoff" placeholder="Dropoff Address" required>
 
-  <button type="submit">Add Job</button>
+<button type="submit">Add Job</button>
 </form>
 
 <table>
@@ -134,48 +95,46 @@ th, td {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-const BASE = 100, TAX = 0.055, RATE = 5;
-let jobs = [], markers = [];
+const BASE=100,TAX=0.055,RATE=5;
+let jobs=[],markers=[];
 
 function openTab(id){
-  document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
-  document.getElementById(id).style.display='block';
-  if(id==="mapTab") setTimeout(()=>map.invalidateSize(),200);
+document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
+document.getElementById(id).style.display='block';
+if(id==='mapTab')setTimeout(()=>map.invalidateSize(),200);
 }
 openTab('jobs');
 
-const map = L.map('map',{zoomControl:true}).setView([39,-98],4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
+const map=L.map('map').setView([39,-98],4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 async function geo(a){
-  try{
-    let r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`);
-    let d=await r.json();
-    return d.length?[+d[0].lat,+d[0].lon]:null;
-  }catch{ return null; }
+try{
+let r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`);
+let d=await r.json();
+return d.length?[+d[0].lat,+d[0].lon]:null;
+}catch{return null;}
 }
 
 function miles(a,b){
-  if(!a||!b) return 0;
-  let R=3958.8,t=Math.PI/180;
-  let dLat=(b[0]-a[0])*t,dLon=(b[1]-a[1])*t;
-  let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
+if(!a||!b)return 0;
+let R=3958.8,t=Math.PI/180;
+let dLat=(b[0]-a[0])*t,dLon=(b[1]-a[1])*t;
+let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;
+return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
 }
 
-jobForm.onsubmit = async e=>{
+jobForm.onsubmit=async e=>{
 e.preventDefault();
-
 let j={
- phone:phone.value,
- customer:customer.value,
- vehicle:vehicle.value,
- driver:driver.value,
- status:status.value,
- truckA:truck.value,
- pickA:pickup.value,
- dropA:dropoff.value
+phone:phone.value,
+customer:customer.value,
+vehicle:vehicle.value,
+driver:driver.value,
+status:status.value,
+truckA:truck.value,
+pickA:pickup.value,
+dropA:dropoff.value
 };
 
 j.truck=await geo(j.truckA);
@@ -223,9 +182,7 @@ invoiceTable.innerHTML+=`
 <td><span class="action" onclick="printInv(${i})">Print</span></td>
 </tr>`;
 
-if(j.pick){
-markers.push(L.marker(j.pick).addTo(map).bindPopup(j.customer));
-}
+if(j.pick)markers.push(L.marker(j.pick).addTo(map).bindPopup(j.customer));
 });
 
 Object.keys(drivers).forEach(d=>{
@@ -236,18 +193,20 @@ driverTable.innerHTML+=`
 });
 }
 
-function del(i){ if(confirm("Delete job?")){ jobs.splice(i,1); render(); } }
+function del(i){if(confirm("Delete job?")){jobs.splice(i,1);render();}}
 
 function edit(i){
-let s=prompt("Enter status: EnRoute / Hooked / Completed",jobs[i].status);
-if(["EnRoute","Hooked","Completed"].includes(s)) jobs[i].status=s;
+let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
+if(["EnRoute","Hooked","Completed"].includes(s))jobs[i].status=s;
 render();
 }
 
 function printInv(i){
 let j=jobs[i];
-let w=window.open("");
+let w=window.open("","_blank");
 w.document.write(`
+<!DOCTYPE html><html><head><title>Invoice</title></head>
+<body style="font-family:Arial;padding:20px">
 <h2>Tow Invoice</h2>
 <p><b>Customer:</b> ${j.customer}</p>
 <p><b>Phone:</b> ${j.phone}</p>
@@ -255,8 +214,10 @@ w.document.write(`
 <p><b>Status:</b> ${j.status}</p>
 <p><b>Miles:</b> ${j.miles.toFixed(1)}</p>
 <h3>Total: $${j.total.toFixed(2)}</h3>
-<script>window.print();</script>
+</body></html>
 `);
+w.document.close();
+w.onload=()=>w.print();
 }
 </script>
 
