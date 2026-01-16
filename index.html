@@ -3,288 +3,300 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>M&S Towing Dispatch Dashboard</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<title>Towing Dispatch Dashboard</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
 <style>
-body { font-family: Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 0; }
-header { background: #2b3e50; color: white; padding: 20px; text-align: center; }
-nav { display: flex; justify-content: center; background: #1c2b38; }
-nav button { padding: 15px 25px; margin: 0; border: none; background: #1c2b38; color: white; cursor: pointer; font-size: 16px; transition: background 0.3s; }
-nav button:hover { background: #3a4f65; }
-.tab-content { display: none; padding: 20px; }
-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-table, th, td { border: 1px solid #ccc; }
-th, td { padding: 10px; text-align: left; }
-input, button { padding: 8px; margin: 5px 0; }
-#map { height: 500px; width: 100%; margin-top: 15px; }
-#loading { display: none; padding: 10px; background: #ffd; border: 1px solid #ccc; margin-bottom: 10px; }
-.action-btn { cursor: pointer; color: blue; text-decoration: underline; background: none; border: none; padding: 0; margin: 0; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #eef2f5;
+}
+header {
+  background: #1f2937;
+  color: white;
+  padding: 15px;
+  text-align: center;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  background: #111827;
+}
+nav button {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  background: #111827;
+  color: white;
+  cursor: pointer;
+}
+nav button:hover {
+  background: #374151;
+}
+.tab {
+  display: none;
+  padding: 15px;
+}
+input, select, button {
+  padding: 10px;
+  margin: 5px 0;
+  width: 100%;
+  font-size: 16px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+  overflow-x: auto;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+.action {
+  color: blue;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.status {
+  font-weight: bold;
+}
+.status.En\ Route { color: orange; }
+.status.Hooked { color: blue; }
+.status.Completed { color: green; }
+
+#map { height: 400px; }
+
+@media (max-width: 700px) {
+  table { display: block; overflow-x: auto; }
+}
 </style>
 </head>
+
 <body>
 
 <header>
-<h1>Towing Dispatch Dashboard</h1>
+  <h2>M&S Towing Dispatch Dashboard</h2>
 </header>
 
 <nav>
-<button onclick="openTab('jobs')">Jobs</button>
-<button onclick="openTab('revenue')">Revenue</button>
-<button onclick="openTab('invoices')">Invoices</button>
-<button onclick="openTab('map')">GPS Map</button>
+  <button onclick="openTab('jobs')">Jobs</button>
+  <button onclick="openTab('invoices')">Invoices</button>
+  <button onclick="openTab('drivers')">Drivers</button>
+  <button onclick="openTab('mapTab')">Map</button>
 </nav>
 
-<div id="jobs" class="tab-content">
-<h2>Active Jobs</h2>
-<div id="loading">Processing addresses, please wait...</div>
+<!-- JOBS -->
+<div id="jobs" class="tab">
+<h3>Add Job</h3>
+
 <form id="jobForm">
-<input type="text" id="customerName" placeholder="Customer Name" required>
-<input type="text" id="vehicleInfo" placeholder="Vehicle Info (Make/Model)" required>
-<input type="text" id="truckLocation" placeholder="Tow Truck Starting Location" required>
-<input type="text" id="pickupAddress" placeholder="Pickup Address" required>
-<input type="text" id="dropoffAddress" placeholder="Dropoff Address" required>
-<button type="submit">Add Job</button>
+  <input id="phone" placeholder="Phone Number" required>
+  <input id="customer" placeholder="Customer Name" required>
+  <input id="vehicle" placeholder="Vehicle Info" required>
+  <input id="driver" placeholder="Driver Name" required>
+
+  <select id="status">
+    <option>En Route</option>
+    <option>Hooked</option>
+    <option>Completed</option>
+  </select>
+
+  <input id="truck" placeholder="Truck Starting Address" required>
+  <input id="pickup" placeholder="Pickup Address" required>
+  <input id="dropoff" placeholder="Dropoff Address" required>
+
+  <button type="submit">Add Job</button>
 </form>
-<table id="jobsTable">
+
+<table>
 <thead>
 <tr>
+<th>Driver</th>
+<th>Status</th>
 <th>Customer</th>
-<th>Vehicle</th>
-<th>Truck Start</th>
-<th>Pickup</th>
-<th>Dropoff</th>
-<th>Miles (Truck→Pickup)</th>
-<th>Miles (Pickup→Dropoff)</th>
-<th>Total ($)</th>
+<th>Phone</th>
+<th>Miles</th>
+<th>Total</th>
 <th>Actions</th>
 </tr>
 </thead>
-<tbody></tbody>
+<tbody id="jobsTable"></tbody>
 </table>
 </div>
 
-<div id="revenue" class="tab-content">
-<h2>Revenue Summary</h2>
-<p>Total Jobs: <span id="totalJobs">0</span></p>
-<p>Total Revenue: $<span id="totalRevenue">0.00</span></p>
-</div>
-
-<div id="invoices" class="tab-content">
-<h2>Invoices</h2>
-<table id="invoiceTable">
+<!-- INVOICES -->
+<div id="invoices" class="tab">
+<h3>Invoices</h3>
+<table>
 <thead>
 <tr>
-<th>Invoice #</th>
+<th>#</th>
+<th>Driver</th>
+<th>Status</th>
 <th>Customer</th>
-<th>Vehicle</th>
-<th>Base ($)</th>
-<th>Tax ($)</th>
-<th>Truck→Pickup ($)</th>
-<th>Pickup→Dropoff ($)</th>
-<th>Total ($)</th>
-<th>Actions</th>
+<th>Total</th>
+<th>Print</th>
 </tr>
 </thead>
-<tbody></tbody>
+<tbody id="invoiceTable"></tbody>
 </table>
 </div>
 
-<div id="map" class="tab-content">
-<h2>GPS Map</h2>
+<!-- DRIVERS -->
+<div id="drivers" class="tab">
+<h3>Driver Revenue</h3>
+<table>
+<thead>
+<tr>
+<th>Driver</th>
+<th>Total Jobs</th>
+<th>Total Revenue</th>
+</tr>
+</thead>
+<tbody id="driverTable"></tbody>
+</table>
+</div>
+
+<!-- MAP -->
+<div id="mapTab" class="tab">
+<h3>Live Job Map</h3>
 <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <script>
-const baseTow = 100;
-const taxRate = 0.055;
-const perMileRate = 5;
+const BASE = 100;
+const TAX = 0.055;
+const RATE = 5;
+
 let jobs = [];
-let invoiceCount = 1;
 let markers = [];
 
-function openTab(tabName) {
-document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-document.getElementById(tabName).style.display = 'block';
+function openTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
+  document.getElementById(id).style.display='block';
 }
 openTab('jobs');
 
-// Initialize map
-const map = L.map('map').setView([39.5, -98.35], 4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-maxZoom: 19,
-attribution: '© OpenStreetMap'
-}).addTo(map);
+const map = L.map('map').setView([39,-98],4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Geocode function
-async function geocode(address){
-try{
-const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
-const response = await fetch(url);
-const data = await response.json();
-if(data && data.length>0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-else { alert(`Address not found: ${address}`); return null; }
-}catch(err){ alert('Geocoding failed'); return null; }
+async function geo(a){
+  let r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`);
+  let d = await r.json();
+  return d.length?[+d[0].lat,+d[0].lon]:null;
+}
+function miles(a,b){
+  let R=3958.8,t=Math.PI/180;
+  let dLat=(b[0]-a[0])*t,dLon=(b[1]-a[1])*t;
+  let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
 }
 
-// Distance in miles using Haversine
-function distanceMiles(coord1, coord2){
-const R=3958.8;
-const rad=Math.PI/180;
-const dLat=(coord2[0]-coord1[0])*rad;
-const dLon=(coord2[1]-coord1[1])*rad;
-const a=Math.sin(dLat/2)**2 + Math.cos(coord1[0]*rad)*Math.cos(coord2[0]*rad)*Math.sin(dLon/2)**2;
-const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-return R*c;
-}
-
-// Add Job Form
-document.getElementById('jobForm').addEventListener('submit', async function(e){
+jobForm.onsubmit = async e=>{
 e.preventDefault();
-document.getElementById('loading').style.display='block';
 
-const customer = document.getElementById('customerName').value;
-const vehicle = document.getElementById('vehicleInfo').value;
-const truckLocation = document.getElementById('truckLocation').value;
-const pickupAddress = document.getElementById('pickupAddress').value;
-const dropoffAddress = document.getElementById('dropoffAddress').value;
+let j={
+ phone:phone.value,
+ customer:customer.value,
+ vehicle:vehicle.value,
+ driver:driver.value,
+ status:status.value,
+ truckA:truck.value,
+ pickA:pickup.value,
+ dropA:dropoff.value
+};
 
-// Geocode all addresses
-const truckCoords = await geocode(truckLocation);
-const pickupCoords = await geocode(pickupAddress);
-const dropoffCoords = await geocode(dropoffAddress);
-document.getElementById('loading').style.display='none';
-if(!truckCoords||!pickupCoords||!dropoffCoords) return;
+j.truck=await geo(j.truckA);
+j.pick=await geo(j.pickA);
+j.drop=await geo(j.dropA);
 
-// Calculate miles
-const milesTruckToPickup = distanceMiles(truckCoords,pickupCoords).toFixed(1);
-const milesPickupToDrop = distanceMiles(pickupCoords,dropoffCoords).toFixed(1);
-const chargeTruckToPickup = (milesTruckToPickup*perMileRate).toFixed(2);
-const chargePickupToDrop = (milesPickupToDrop*perMileRate).toFixed(2);
+j.miles=miles(j.truck,j.pick)+miles(j.pick,j.drop);
+j.total=BASE+(BASE*TAX)+(j.miles*RATE);
 
-// Tax
-const tax = (baseTow*taxRate).toFixed(2);
-const total = (baseTow + parseFloat(tax) + parseFloat(chargeTruckToPickup) + parseFloat(chargePickupToDrop)).toFixed(2);
+jobs.push(j);
+render();
+jobForm.reset();
+};
 
-const job={customer,vehicle,truckLocation,truckCoords,pickupAddress,pickupCoords,dropoffAddress,dropoffCoords,
-milesTruckToPickup,milesPickupToDrop,chargeTruckToPickup,chargePickupToDrop,tax,total};
-
-jobs.push(job);
-updateJobsTable();
-updateInvoicesTable();
-updateRevenue();
-document.getElementById('jobForm').reset();
-});
-
-// Update Jobs Table
-function updateJobsTable(){
-const tbody=document.querySelector('#jobsTable tbody');
-tbody.innerHTML='';
-jobs.forEach((job,i)=>{
-const row=document.createElement('tr');
-row.innerHTML = `<td>${job.customer}</td>
-<td>${job.vehicle}</td>
-<td>${job.truckLocation}</td>
-<td>${job.pickupAddress}</td>
-<td>${job.dropoffAddress}</td>
-<td>${job.milesTruckToPickup}</td>
-<td>${job.milesPickupToDrop}</td>
-<td>${job.total}</td>
-<td>
-<button class="action-btn" onclick="editJob(${i})">Edit</button> |
-<button class="action-btn" onclick="deleteJob(${i})">Delete</button>
-</td>`;
-tbody.appendChild(row);
-});
-
-// Update Map
+function render(){
+jobsTable.innerHTML="";
+invoiceTable.innerHTML="";
+driverTable.innerHTML="";
 markers.forEach(m=>map.removeLayer(m));
 markers=[];
-jobs.forEach(job=>{
-markers.push(L.marker(job.truckCoords).addTo(map).bindPopup(`<b>${job.customer}</b><br>Truck Start`));
-markers.push(L.marker(job.pickupCoords).addTo(map).bindPopup(`<b>${job.customer}</b><br>Pickup`));
-markers.push(L.marker(job.dropoffCoords).addTo(map).bindPopup(`<b>${job.customer}</b><br>Dropoff`));
-});
-fitMap();
-}
 
-// Update Invoices Table
-function updateInvoicesTable(){
-const tbody=document.querySelector('#invoiceTable tbody');
-tbody.innerHTML='';
-jobs.forEach((job,i)=>{
-const row=document.createElement('tr');
-row.innerHTML = `<td>#${i+1}</td>
-<td>${job.customer}</td>
-<td>${job.vehicle}</td>
-<td>${baseTow.toFixed(2)}</td>
-<td>${job.tax}</td>
-<td>${job.chargeTruckToPickup}</td>
-<td>${job.chargePickupToDrop}</td>
-<td>${job.total}</td>
+let drivers={};
+
+jobs.forEach((j,i)=>{
+drivers[j.driver]=(drivers[j.driver]||0)+j.total;
+
+jobsTable.innerHTML+=`
+<tr>
+<td>${j.driver}</td>
+<td class="status ${j.status}">${j.status}</td>
+<td>${j.customer}</td>
+<td>${j.phone}</td>
+<td>${j.miles.toFixed(1)}</td>
+<td>$${j.total.toFixed(2)}</td>
 <td>
-<button class="action-btn" onclick="editJob(${i})">Edit</button> |
-<button class="action-btn" onclick="deleteJob(${i})">Delete</button>
-</td>`;
-tbody.appendChild(row);
+<span class="action" onclick="edit(${i})">Edit</span> |
+<span class="action" onclick="del(${i})">Delete</span>
+</td>
+</tr>`;
+
+invoiceTable.innerHTML+=`
+<tr>
+<td>${i+1}</td>
+<td>${j.driver}</td>
+<td>${j.status}</td>
+<td>${j.customer}</td>
+<td>$${j.total.toFixed(2)}</td>
+<td><span class="action" onclick="printInv(${i})">Print</span></td>
+</tr>`;
+
+markers.push(L.marker(j.pick).addTo(map).bindPopup(j.customer));
+});
+
+Object.keys(drivers).forEach(d=>{
+driverTable.innerHTML+=`
+<tr>
+<td>${d}</td>
+<td>${jobs.filter(j=>j.driver===d).length}</td>
+<td>$${drivers[d].toFixed(2)}</td>
+</tr>`;
 });
 }
 
-// Edit Job
-async function editJob(i){
-const job = jobs[i];
-const newCustomer = prompt("Customer Name:", job.customer); if(newCustomer===null) return;
-const newVehicle = prompt("Vehicle Info:", job.vehicle); if(newVehicle===null) return;
-const newTruck = prompt("Truck Start Location:", job.truckLocation); if(newTruck===null) return;
-const newPickup = prompt("Pickup Address:", job.pickupAddress); if(newPickup===null) return;
-const newDropoff = prompt("Dropoff Address:", job.dropoffAddress); if(newDropoff===null) return;
+function del(i){ if(confirm("Delete job?")){ jobs.splice(i,1); render(); } }
 
-document.getElementById('loading').style.display='block';
-const truckCoords = await geocode(newTruck);
-const pickupCoords = await geocode(newPickup);
-const dropoffCoords = await geocode(newDropoff);
-document.getElementById('loading').style.display='none';
-if(!truckCoords||!pickupCoords||!dropoffCoords) return;
-
-const milesTruckToPickup = distanceMiles(truckCoords,pickupCoords).toFixed(1);
-const milesPickupToDrop = distanceMiles(pickupCoords,dropoffCoords).toFixed(1);
-const chargeTruckToPickup = (milesTruckToPickup*perMileRate).toFixed(2);
-const chargePickupToDrop = (milesPickupToDrop*perMileRate).toFixed(2);
-const tax = (baseTow*taxRate).toFixed(2);
-const total = (baseTow + parseFloat(tax) + parseFloat(chargeTruckToPickup) + parseFloat(chargePickupToDrop)).toFixed(2);
-
-jobs[i]={customer:newCustomer,vehicle:newVehicle,truckLocation:newTruck,truckCoords,pickupAddress:newPickup,pickupCoords,
-dropoffAddress:newDropoff,dropoffCoords,milesTruckToPickup,milesPickupToDrop,chargeTruckToPickup,chargePickupToDrop,tax,total};
-
-updateJobsTable();
-updateInvoicesTable();
-updateRevenue();
+function edit(i){
+let j=jobs[i];
+j.status=prompt("Status",j.status);
+render();
 }
 
-// Delete Job
-function deleteJob(i){
-if(!confirm("Delete this job?")) return;
-jobs.splice(i,1);
-updateJobsTable();
-updateInvoicesTable();
-updateRevenue();
-}
-
-// Revenue
-function updateRevenue(){
-document.getElementById('totalJobs').textContent=jobs.length;
-const revenue = jobs.reduce((sum,job)=>sum + parseFloat(job.total),0);
-document.getElementById('totalRevenue').textContent=revenue.toFixed(2);
-}
-
-// Map Fit
-function fitMap(){
-if(markers.length>0){
-const group = new L.featureGroup(markers);
-map.fitBounds(group.getBounds().pad(0.2));
-}
+function printInv(i){
+let j=jobs[i];
+let w=window.open("");
+w.document.write(`
+<h2>Tow Invoice</h2>
+<p><b>Customer:</b> ${j.customer}</p>
+<p><b>Phone:</b> ${j.phone}</p>
+<p><b>Driver:</b> ${j.driver}</p>
+<p><b>Status:</b> ${j.status}</p>
+<p><b>Miles:</b> ${j.miles.toFixed(1)}</p>
+<h3>Total: $${j.total.toFixed(2)}</h3>
+<script>window.print();</script>
+`);
 }
 </script>
+
 </body>
 </html>
-
