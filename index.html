@@ -8,30 +8,26 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
-body {margin:0; font-family:Arial; background:#f4f6f8;}
+body {margin:0; font-family:Arial, sans-serif; background:#f4f6f8;}
 header {background:#1f2937; color:white; padding:12px;}
 nav {display:flex; background:#111827;}
-nav button {flex:1; padding:12px; border:none; color:white; background:#111827;}
-nav button:hover {background:#374151;}
+nav button {flex:1; padding:12px; border:none; background:#111827; color:white;}
 .tab {display:none; padding:15px;}
-input, select, button {width:100%; padding:10px; margin:5px 0;}
+input, select, button {padding:10px; margin:5px 0; width:100%;}
 button {background:#2563eb; color:white; border:none;}
 table {width:100%; border-collapse:collapse;}
 th, td {border:1px solid #ccc; padding:6px;}
-.status {color:white; padding:2px 6px; border-radius:4px;}
-.EnRoute {background:#f97316;}
-.Hooked {background:#3b82f6;}
-.Completed {background:#16a34a;}
+.status.EnRoute {background:#f97316; color:white;}
+.status.Hooked {background:#3b82f6; color:white;}
+.status.Completed {background:#16a34a; color:white;}
 #map {height:50vh;}
-.card {background:white; padding:15px; margin:10px 0;}
-.action {color:blue; cursor:pointer;}
 </style>
 </head>
 
 <body>
 
 <header>
-<h2>M&S Towing Dispatch</h2>
+<h1>M&S Towing</h1>
 </header>
 
 <nav>
@@ -40,101 +36,81 @@ th, td {border:1px solid #ccc; padding:6px;}
 <button onclick="openTab('mapTab')">Map</button>
 </nav>
 
-<div id="jobs" class="tab card">
-<h3>Add Job</h3>
+<div id="jobs" class="tab">
 <form id="jobForm">
-<input id="customer" placeholder="Customer" required>
+<input id="customer" placeholder="Customer Name" required>
 <input id="phone" placeholder="Phone" required>
 <input id="driver" placeholder="Driver" required>
 <input id="truck" placeholder="Truck Address" required>
 <input id="pickup" placeholder="Pickup Address" required>
 <input id="dropoff" placeholder="Dropoff Address" required>
 
-<select id="priority">
-<option>Normal</option><option>Urgent</option><option>Police</option><option>Accident</option>
-</select>
-
-<select id="towType">
-<option>Impound</option><option>Breakdown</option><option>Repo</option><option>Jumpstart</option>
-</select>
-
 <button>Add Job</button>
 </form>
 
-<h3>Jobs</h3>
 <table>
-<thead>
-<tr><th>#</th><th>Driver</th><th>Status</th><th>Customer</th><th>Miles</th><th>Total</th><th>Actions</th></tr>
-</thead>
+<thead><tr><th>Job</th><th>Driver</th><th>Status</th><th>Actions</th></tr></thead>
 <tbody id="jobsTable"></tbody>
 </table>
 </div>
 
-<div id="invoices" class="tab card">
-<h3>Invoices</h3>
+<div id="invoices" class="tab">
 <table>
-<thead>
-<tr><th>#</th><th>Customer</th><th>Driver</th><th>Payment</th><th>Total</th></tr>
-</thead>
 <tbody id="invoiceTable"></tbody>
 </table>
 </div>
 
-<div id="mapTab" class="tab card">
-<h3>Map</h3>
+<div id="mapTab" class="tab">
 <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
+<!-- ✅ FIREBASE -->
 <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-/* 🔥 FIREBASE */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-getFirestore, collection, addDoc, onSnapshot,
-deleteDoc, doc, updateDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-/* 👉 PASTE YOUR FIREBASE CONFIG HERE */
+/* 🔥 YOUR CONFIG */
 const firebaseConfig = {
-  apiKey: "AIzaSyA7s4ASCZ3fY0eJt_rYvLy0e5_e8IJrVuw",
-  authDomain: "towing-fb504.firebaseapp.com",
-  projectId: "towing-fb504",
-  storageBucket: "towing-fb504.firebasestorage.app",
-  messagingSenderId: "298894034345",
-  appId: "1:298894034345:web:196a2b1884683da3d430b8",
-  measurementId: "G-FM4QNN6VB4"
+  apiKey: "AIzaSyB9mtP2Emr_Dxbpe_x5BO-7edan_vG8Euo",
+  authDomain: "dispatch-app-fdcf6.firebaseapp.com",
+  projectId: "dispatch-app-fdcf6",
+  storageBucket: "dispatch-app-fdcf6.firebasestorage.app",
+  messagingSenderId: "460899401434",
+  appId: "1:460899401434:web:29dc46e13aba533319afe3",
+  measurementId: "G-8Q81M44RD9",
+  databaseURL: "https://dispatch-app-fdcf6-default-rtdb.firebaseio.com/"
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const jobsRef = collection(db, "jobs");
+const db = getDatabase(app);
+const jobsRef = ref(db, "jobs");
 
-/* APP DATA */
-const BASE=100, TAX=0.055, RATE=5;
-let jobs=[], markers=[];
+let jobs = [];
 
-/* UI */
-window.openTab = id=>{
-document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
-document.getElementById(id).style.display='block';
-if(id==="mapTab") setTimeout(()=>map.invalidateSize(),200);
-};
-openTab('jobs');
+/* ✅ REALTIME LISTENER */
+onValue(jobsRef, (snapshot) => {
+  jobs = [];
+  snapshot.forEach(child => {
+    jobs.push({ key: child.key, ...child.val() });
+  });
+  render();
+});
 
-/* MAP */
+/* --- MAP --- */
 const map=L.map('map').setView([39,-98],4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let markers=[];
 
-/* GEO */
+/* --- GEO --- */
 async function geo(a){
 let r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`);
 let d=await r.json();
 return d.length?[+d[0].lat,+d[0].lon]:null;
 }
 
-/* DISTANCE */
+/* --- DISTANCE --- */
 function miles(a,b){
 if(!a||!b) return 0;
 let R=3958.8,t=Math.PI/180;
@@ -143,52 +119,7 @@ let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;
 return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
 }
 
-/* REALTIME */
-onSnapshot(jobsRef, snap=>{
-jobs=[];
-snap.forEach(d=>jobs.push({...d.data(), docId:d.id}));
-render();
-});
-
-/* RENDER */
-function render(){
-jobsTable.innerHTML="";
-invoiceTable.innerHTML="";
-markers.forEach(m=>map.removeLayer(m)); markers=[];
-
-jobs.forEach((j,i)=>{
-
-jobsTable.innerHTML+=`
-<tr>
-<td>${j.id}</td>
-<td>${j.driver}</td>
-<td class="status ${j.status}">${j.status}</td>
-<td>${j.customer}</td>
-<td>${j.miles.toFixed(1)}</td>
-<td>$${j.total.toFixed(2)}</td>
-<td>
-<span class="action" onclick="edit(${i})">Edit</span> |
-<span class="action" onclick="del(${i})">Delete</span>
-</td>
-</tr>`;
-
-invoiceTable.innerHTML+=`
-<tr>
-<td>${j.id}</td>
-<td>${j.customer}</td>
-<td>${j.driver}</td>
-<td onclick="togglePayment(${i})" class="action">${j.payment}</td>
-<td>$${j.total.toFixed(2)}</td>
-</tr>`;
-
-if(j.pick){
-markers.push(L.marker(j.pick).addTo(map)
-.bindPopup(`${j.customer}<br>${j.driver}`));
-}
-});
-}
-
-/* ADD */
+/* --- ADD JOB --- */
 jobForm.onsubmit=async e=>{
 e.preventDefault();
 
@@ -198,41 +129,74 @@ j.customer=customer.value;
 j.phone=phone.value;
 j.driver=driver.value;
 j.status="EnRoute";
-j.priority=priority.value;
-j.towType=towType.value;
 
 j.truck=await geo(truck.value);
 j.pick=await geo(pickup.value);
 j.drop=await geo(dropoff.value);
 
 j.miles=miles(j.truck,j.pick)+miles(j.pick,j.drop);
-j.total=BASE+(BASE*TAX)+(j.miles*RATE);
+j.total=100+(j.miles*5);
+
 j.payment="Unpaid";
 
-await addDoc(jobsRef,j);
+/* ✅ SAVE TO FIREBASE */
+push(jobsRef, j);
 
 jobForm.reset();
 };
 
-/* DELETE */
-window.del=async i=>{
-if(confirm("Delete?")){
-await deleteDoc(doc(db,"jobs",jobs[i].docId));
+/* --- DELETE --- */
+window.del = function(i){
+remove(ref(db, "jobs/" + jobs[i].key));
 }
-};
 
-/* EDIT STATUS */
-window.edit=async i=>{
-let s=prompt("EnRoute / Hooked / Completed",jobs[i].status);
-if(s) await updateDoc(doc(db,"jobs",jobs[i].docId),{status:s});
-};
+/* --- EDIT STATUS --- */
+window.edit = function(i){
+let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
+if(s){
+update(ref(db, "jobs/" + jobs[i].key), { status:s });
+}
+}
 
-/* PAYMENT */
-window.togglePayment=async i=>{
-let p=jobs[i].payment==="Paid"?"Unpaid":"Paid";
-await updateDoc(doc(db,"jobs",jobs[i].docId),{payment:p});
-};
+/* --- PAYMENT --- */
+window.togglePayment = function(i){
+let newStatus = jobs[i].payment==="Paid"?"Unpaid":"Paid";
+update(ref(db, "jobs/" + jobs[i].key), { payment:newStatus });
+}
+
+/* --- RENDER --- */
+function render(){
+jobsTable.innerHTML="";
+markers.forEach(m=>map.removeLayer(m));
+markers=[];
+
+jobs.forEach((j,i)=>{
+jobsTable.innerHTML+=`
+<tr>
+<td>${j.id}</td>
+<td>${j.driver}</td>
+<td class="status ${j.status}">${j.status}</td>
+<td>
+<button onclick="edit(${i})">Edit</button>
+<button onclick="del(${i})">Delete</button>
+</td>
+</tr>
+`;
+
+if(j.pick){
+markers.push(L.marker(j.pick).addTo(map).bindPopup(j.customer));
+}
+});
+}
+
+/* --- TABS --- */
+window.openTab=function(id){
+document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
+document.getElementById(id).style.display='block';
+}
+openTab('jobs');
 
 </script>
+
 </body>
 </html>
