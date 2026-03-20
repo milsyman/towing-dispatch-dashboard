@@ -29,9 +29,9 @@ input, button {margin:5px 0; padding:8px;}
 
 <header><h1>M&S Towing Unified Dashboard</h1></header>
 <nav>
-  <button onclick="openTab('mapTab')">Map</button>
-  <button onclick="openTab('jobsTab')">Jobs</button>
-  <button onclick="openTab('chatTab')">Driver Chat</button>
+  <button id="btnMap">Map</button>
+  <button id="btnJobs">Jobs</button>
+  <button id="btnChat">Driver Chat</button>
 </nav>
 
 <div id="mapTab" class="tab">
@@ -215,6 +215,13 @@ function openTab(id){
   document.getElementById(id).style.display='block';
   setTimeout(()=>map.invalidateSize(true),300);
 }
+
+/* ===== ATTACH TABS TO BUTTONS ===== */
+document.getElementById('btnMap').addEventListener('click', ()=>openTab('mapTab'));
+document.getElementById('btnJobs').addEventListener('click', ()=>openTab('jobsTab'));
+document.getElementById('btnChat').addEventListener('click', ()=>openTab('chatTab'));
+
+/* ===== SHOW MAP BY DEFAULT ===== */
 openTab('mapTab');
 
 </script>
