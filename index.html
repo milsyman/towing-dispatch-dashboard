@@ -71,8 +71,8 @@ input, button {margin:5px 0; padding:8px;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onValue, onChildAdded, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-/* ===== SINGLE FIREBASE PROJECT CONFIG ===== */
-const dispatchApp = initializeApp({
+/* ===== SINGLE FIREBASE PROJECT ===== */
+const app = initializeApp({
   apiKey: "AIzaSyB9mtP2Emr_Dxbpe_x5BO-7edan_vG8Euo",
   authDomain: "dispatch-app-fdcf6.firebaseapp.com",
   databaseURL: "https://dispatch-app-fdcf6-default-rtdb.firebaseio.com/",
@@ -80,14 +80,10 @@ const dispatchApp = initializeApp({
   storageBucket: "dispatch-app-fdcf6.firebasestorage.app",
   messagingSenderId: "460899401434",
   appId: "1:460899401434:web:29dc46e13aba533319afe3"
-}, "dispatchApp");
-
-const app = initializeApp(firebaseConfig);
+});
 const db = getDatabase(app);
-
-/* ===== DATABASE REFERENCES ===== */
 const jobsRef = ref(db, "jobs");
-const messagesRef = ref(db, "chat");
+const chatRef = ref(db, "chat");
 const towRef = ref(db, "locations");
 
 /* ===== LEAFLET MAP ===== */
@@ -105,22 +101,25 @@ async function geo(address){
   }catch{return null;}
 }
 
-/* ===== JOBS LOGIC ===== */
+/* ===== JOBS ===== */
 let jobs=[];
 document.getElementById('jobForm').onsubmit = async e=>{
   e.preventDefault();
-  const j = {
-    id: "JOB-" + Date.now(),
+  const truckCoords = await geo(truck.value);
+  const pickCoords = await geo(pickup.value);
+  const dropCoords = await geo(dropoff.value);
+  
+  push(jobsRef, {
+    id: "JOB-"+Date.now(),
     customer: customer.value,
     phone: phone.value,
     driver: driver.value,
     status: "EnRoute",
     payment: "Unpaid",
-    truck: await geo(truck.value),
-    pick: await geo(pickup.value),
-    drop: await geo(dropoff.value)
-  };
-  push(jobsRef, j);
+    truck: truckCoords,
+    pick: pickCoords,
+    drop: dropCoords
+  });
   e.target.reset();
 };
 
@@ -138,7 +137,6 @@ function renderJobsTable(){
     table.appendChild(tr);
   });
 }
-
 window.editJob = i=>{
   let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
   if(s) update(ref(db,"jobs/"+jobs[i].key),{status:s});
@@ -146,36 +144,32 @@ window.editJob = i=>{
 window.delJob = i=>remove(ref(db,"jobs/"+jobs[i].key));
 
 /* ===== DRIVER CHAT ===== */
-let currentAddress=null;
+let currentLat=null, currentLon=null;
 const sendBtn=document.getElementById('sendBtn');
 if(navigator.geolocation){
   navigator.geolocation.watchPosition(pos=>{
-    currentAddress=`Lat:${pos.coords.latitude}, Lon:${pos.coords.longitude}`;
+    currentLat=pos.coords.latitude; currentLon=pos.coords.longitude;
     sendBtn.disabled=false;
-  }, ()=>{ sendBtn.disabled=true; });
+  }, ()=>sendBtn.disabled=true);
 }
 sendBtn.addEventListener('click', ()=>{
-  const msg = document.getElementById('message').value.trim();
-  if(!currentAddress) return alert("Location not ready");
-  push(messagesRef,{message:msg, location:currentAddress, time:new Date().toISOString()});
+  const msg=document.getElementById('message').value.trim();
+  if(currentLat===null||currentLon===null) return alert("Location not ready");
+  push(chatRef,{message:msg, lat:currentLat, lon:currentLon, time:new Date().toISOString()});
   document.getElementById('message').value="";
 });
 
-onChildAdded(messagesRef, snap=>{
+onChildAdded(chatRef, snap=>{
   const data = snap.val();
   const li = document.createElement('li');
-  li.textContent=(data.message||"")+" | 📍 "+(data.location||"");
+  li.textContent=(data.message||"")+" | 📍 "+(data.lat||"")+","+(data.lon||"");
   document.getElementById('messages').appendChild(li);
 
-  if(data.location){
-    const coords = data.location.match(/Lat:(.*), Lon:(.*)/);
-    if(coords){
-      const lat = parseFloat(coords[1]), lon=parseFloat(coords[2]);
-      const m = L.circleMarker([lat,lon],{color:'purple'}).addTo(map)
-        .bindPopup(`<b>Chat Message</b><br>${data.message}<br>${data.time}`);
-      chatMarkers.push(m);
-      fitMapBounds();
-    }
+  if(data.lat && data.lon){
+    const m=L.circleMarker([data.lat,data.lon],{color:'purple'}).addTo(map)
+      .bindPopup(`<b>Chat Message</b><br>${data.message}<br>${data.time}`);
+    chatMarkers.push(m);
+    fitMapBounds();
   }
 });
 
@@ -185,7 +179,7 @@ onValue(towRef, snap=>{
   const data = snap.val()||{};
   Object.values(data).forEach(loc=>{
     if(!loc.lat||!loc.lon) return;
-    const m=L.marker([Number(loc.lat),Number(loc.lon)]).addTo(map)
+    const m=L.marker([loc.lat,loc.lon]).addTo(map)
       .bindPopup(`<b>Tow Request</b><br>${loc.address}<br>${loc.time||''}`);
     towMarkers.push(m);
   });
@@ -197,7 +191,7 @@ function renderMap(){
   clearMarkers(jobMarkers);
   jobs.forEach(j=>{
     if(j.pick){
-      const m = L.marker(j.pick).addTo(map)
+      const m=L.marker(j.pick).addTo(map)
         .bindPopup(`<b>Job ID:</b> ${j.id}<br><b>Customer:</b> ${j.customer}<br><b>Driver:</b> ${j.driver}<br>
           <b>Pickup:</b> ${j.pick}<br><b>Dropoff:</b> ${j.drop}<br><b>Status:</b> ${j.status}<br>
           <b>Payment:</b> ${j.payment}`);
@@ -208,9 +202,9 @@ function renderMap(){
 }
 
 function fitMapBounds(){
-  const allMarkers = [...jobMarkers,...towMarkers,...chatMarkers];
+  const allMarkers=[...jobMarkers,...towMarkers,...chatMarkers];
   if(allMarkers.length){
-    const group = L.featureGroup(allMarkers);
+    const group=L.featureGroup(allMarkers);
     map.fitBounds(group.getBounds().pad(0.2));
   }
 }
