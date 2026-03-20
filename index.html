@@ -3,227 +3,210 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>M&S Towing Unified Dashboard</title>
+<title>M&S Towing Dispatch</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
 body {margin:0; font-family:Arial; background:#f4f6f8;}
-header {background:#1f2937; color:white; padding:12px; text-align:center;}
+header {background:#1f2937; color:white; padding:12px;}
 nav {display:flex; background:#111827;}
-nav button {flex:1; padding:12px; border:none; color:white; background:#111827; cursor:pointer;}
-.tab {display:none; padding:15px; overflow:auto; height:80vh;}
-table {width:100%; border-collapse:collapse; margin-top:10px;}
+nav button {flex:1; padding:12px; border:none; color:white; background:#111827;}
+.tab {display:none; padding:15px;}
+input, button {width:100%; padding:10px; margin:5px 0;}
+table {width:100%; border-collapse:collapse;}
 th, td {border:1px solid #ccc; padding:6px;}
+#map {height:60vh; width:100%; min-height:400px;}
+.action{cursor:pointer;color:blue;}
 .status.EnRoute {background:orange;color:white;}
 .status.Hooked {background:blue;color:white;}
 .status.Completed {background:green;color:white;}
-#map {height:80vh; width:100%; min-height:500px;}
-.action{cursor:pointer;color:blue;}
-#legend {background:white;padding:10px;position:absolute;bottom:10px;left:10px;z-index:999;}
-#legend div{margin:5px 0;}
-ul {list-style:none; padding:0;}
-li {background:rgba(0,0,0,0.2); padding:5px; margin:3px 0; border-radius:5px; word-wrap:break-word;}
-input, button {margin:5px 0; padding:8px;}
 </style>
 </head>
 <body>
-
-<header><h1>M&S Towing Unified Dashboard</h1></header>
+<header><h1>M&S Towing Dispatch</h1></header>
 <nav>
-  <button id="btnMap">Map</button>
-  <button id="btnJobs">Jobs</button>
-  <button id="btnChat">Driver Chat</button>
+<button onclick="openTab('jobs')">Jobs</button>
+<button onclick="openTab('invoices')">Invoices</button>
+<button onclick="openTab('mapTab')">Map</button>
 </nav>
-
+<div id="jobs" class="tab">
+<form id="jobForm">
+<input id="customer" placeholder="Customer" required>
+<input id="phone" placeholder="Phone" required>
+<input id="driver" placeholder="Driver" required>
+<input id="truck" placeholder="Truck Address" required>
+<input id="pickup" placeholder="Pickup Address" required>
+<input id="dropoff" placeholder="Dropoff Address" required>
+<button>Add Job</button>
+</form>
+3/20/26, 3:13 PM Towing Dashboard Integration
+https://chatgpt.com/c/69bda0c1-b088-8327-bbdd-d4adf63feddf 1/6
+<table>
+<thead>
+<tr><th>Job</th><th>Driver</th><th>Status</th><th>Actions</th></tr>
+</thead>
+<tbody id="jobsTable"></tbody>
+</table>
+</div>
+<div id="invoices" class="tab">
+<table>
+<thead>
+<tr><th>Job</th><th>Customer</th><th>Driver</th><th>Payment</th><th>Total</th>
+<th>Print</th></tr>
+</thead>
+<tbody id="invoiceTable"></tbody>
+</table>
+</div>
 <div id="mapTab" class="tab">
-  <div id="map"></div>
-  <div id="legend">
-    <div><span style="color:orange;font-weight:bold;">●</span> Job Pickup</div>
-    <div><span style="color:blue;font-weight:bold;">●</span> Tow Request</div>
-    <div><span style="color:purple;font-weight:bold;">●</span> Driver Chat</div>
-  </div>
+<div id="map"></div>
 </div>
-
-<div id="jobsTab" class="tab">
-  <h2>Dispatch Jobs</h2>
-  <form id="jobForm">
-    <input id="customer" placeholder="Customer" required>
-    <input id="phone" placeholder="Phone" required>
-    <input id="driver" placeholder="Driver" required>
-    <input id="truck" placeholder="Truck Address" required>
-    <input id="pickup" placeholder="Pickup Address" required>
-    <input id="dropoff" placeholder="Dropoff Address" required>
-    <button>Add Job</button>
-  </form>
-  <table>
-    <thead><tr><th>Job</th><th>Driver</th><th>Status</th><th>Actions</th></tr></thead>
-    <tbody id="jobsTable"></tbody>
-  </table>
-</div>
-
-<div id="chatTab" class="tab">
-  <h2>Driver Chat</h2>
-  <input id="message" placeholder="Type your message here" style="width:70%">
-  <button id="sendBtn" disabled>Send</button>
-  <ul id="messages"></ul>
-</div>
-
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onValue, onChildAdded, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-/* ===== SINGLE FIREBASE PROJECT ===== */
-const app = initializeApp({
-  apiKey: "AIzaSyB9mtP2Emr_Dxbpe_x5BO-7edan_vG8Euo",
-  authDomain: "dispatch-app-fdcf6.firebaseapp.com",
-  databaseURL: "https://dispatch-app-fdcf6-default-rtdb.firebaseio.com/",
-  projectId: "dispatch-app-fdcf6",
-  storageBucket: "dispatch-app-fdcf6.firebasestorage.app",
-  messagingSenderId: "460899401434",
-  appId: "1:460899401434:web:29dc46e13aba533319afe3"
-});
+import { getDatabase, ref, push, onValue, remove, update } from
+"https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+const firebaseConfig = {
+ apiKey: "AIzaSyB9mtP2Emr_Dxbpe_x5BO-7edan_vG8Euo",
+ authDomain: "dispatch-app-fdcf6.firebaseapp.com",
+ projectId: "dispatch-app-fdcf6",
+ storageBucket: "dispatch-app-fdcf6.firebasestorage.app",
+ messagingSenderId: "460899401434",
+ appId: "1:460899401434:web:29dc46e13aba533319afe3",
+ databaseURL: "https://dispatch-app-fdcf6-default-rtdb.firebaseio.com/"
+};
+const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const jobsRef = ref(db, "jobs");
-const chatRef = ref(db, "chat");
-const towRef = ref(db, "locations");
-
-/* ===== LEAFLET MAP ===== */
-const map = L.map('map').setView([39,-98],4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-let jobMarkers=[], towMarkers=[], chatMarkers=[];
-function clearMarkers(arr){ arr.forEach(m=>map.removeLayer(m)); arr.length=0; }
-
-/* ===== GEO HELPER ===== */
-async function geo(address){
-  try{
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-    const data = await res.json();
-    return data.length?[+data[0].lat,+data[0].lon]:null;
-  }catch{return null;}
-}
-
-/* ===== JOBS ===== */
 let jobs=[];
-document.getElementById('jobForm').onsubmit = async e=>{
-  e.preventDefault();
-  const truckCoords = await geo(truck.value);
-  const pickCoords = await geo(pickup.value);
-  const dropCoords = await geo(dropoff.value);
-  
-  push(jobsRef, {
-    id: "JOB-"+Date.now(),
-    customer: customer.value,
-    phone: phone.value,
-    driver: driver.value,
-    status: "EnRoute",
-    payment: "Unpaid",
-    truck: truckCoords,
-    pick: pickCoords,
-    drop: dropCoords
-  });
-  e.target.reset();
-};
-
+let markers=[];
+3/20/26, 3:13 PM Towing Dashboard Integration
+https://chatgpt.com/c/69bda0c1-b088-8327-bbdd-d4adf63feddf 2/6
+/* MAP INIT */
+const map = L.map('map', { preferCanvas:true }).setView([39,-98],4);
+const tileLayer = L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{ maxZoom:19 }
+).addTo(map);
+/* 🔥 REALTIME */
 onValue(jobsRef, snap=>{
-  jobs=[]; snap.forEach(c=>jobs.push({key:c.key,...c.val()}));
-  renderJobsTable(); renderMap();
+jobs=[];
+snap.forEach(c=>jobs.push({key:c.key,...c.val()}));
+render();
 });
-
-function renderJobsTable(){
-  const table = document.getElementById('jobsTable'); table.innerHTML="";
-  jobs.forEach((j,i)=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML=`<td>${j.id}</td><td>${j.driver}</td><td class="status ${j.status}">${j.status}</td>
-      <td><span class="action" onclick="editJob(${i})">Edit</span> | <span class="action" onclick="delJob(${i})">Del</span></td>`;
-    table.appendChild(tr);
-  });
+/* GEO */
+async function geo(a){
+let r=await fetch( https://nominatim.openstreetmap.org/search?
+format=json&q=${encodeURIComponent(a)} );
+let d=await r.json();
+return d.length?[+d[0].lat,+d[0].lon]:null;
 }
-window.editJob = i=>{
-  let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
-  if(s) update(ref(db,"jobs/"+jobs[i].key),{status:s});
+/* DISTANCE */
+function miles(a,b){
+if(!a||!b) return 0;
+let R=3958.8,t=Math.PI/180;
+let dLat=(b[0]-a[0])*t,dLon=(b[1]-a[1])*t;
+let h=Math.sin(dLat/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLon/2)**2;
+return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
+}
+/* ADD */
+jobForm.onsubmit=async e=>{
+e.preventDefault();
+let j={
+id:"JOB-"+Date.now(),
+customer:customer.value,
+phone:phone.value,
+driver:driver.value,
+status:"EnRoute",
+payment:"Unpaid"
 };
-window.delJob = i=>remove(ref(db,"jobs/"+jobs[i].key));
-
-/* ===== DRIVER CHAT ===== */
-let currentLat=null, currentLon=null;
-const sendBtn=document.getElementById('sendBtn');
-if(navigator.geolocation){
-  navigator.geolocation.watchPosition(pos=>{
-    currentLat=pos.coords.latitude; currentLon=pos.coords.longitude;
-    sendBtn.disabled=false;
-  }, ()=>sendBtn.disabled=true);
+3/20/26, 3:13 PM Towing Dashboard Integration
+https://chatgpt.com/c/69bda0c1-b088-8327-bbdd-d4adf63feddf 3/6
+j.truck=await geo(truck.value);
+j.pick=await geo(pickup.value);
+j.drop=await geo(dropoff.value);
+j.miles=miles(j.truck,j.pick)+miles(j.pick,j.drop);
+j.total=100+(j.miles*5);
+push(jobsRef,j);
+jobForm.reset();
+};
+/* DELETE */
+window.del=i=>remove(ref(db,"jobs/"+jobs[i].key));
+/* EDIT */
+window.edit=i=>{
+let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
+if(s) update(ref(db,"jobs/"+jobs[i].key),{status:s});
+};
+/* PAYMENT */
+window.togglePayment=i=>{
+let p=jobs[i].payment==="Paid"?"Unpaid":"Paid";
+update(ref(db,"jobs/"+jobs[i].key),{payment:p});
+};
+/* PRINT */
+window.printInv=i=>{
+let j=jobs[i];
+let w=window.open("");
+w.document.write( <h2>Invoice</h2>
+<p>${j.customer}</p>
+<p>${j.driver}</p>
+<h3>$${j.total.toFixed(2)}</h3> );
+w.print();
+};
+/* RENDER */
+function render(){
+jobsTable.innerHTML="";
+invoiceTable.innerHTML="";
+markers.forEach(m=>map.removeLayer(m));
+markers=[];
+let bounds=[];
+3/20/26, 3:13 PM Towing Dashboard Integration
+https://chatgpt.com/c/69bda0c1-b088-8327-bbdd-d4adf63feddf 4/6
+jobs.forEach((j,i)=>{
+jobsTable.innerHTML+=
+<tr>
+<td>${j.id}</td>
+<td>${j.driver}</td>
+<td class="status ${j.status}">${j.status}</td>
+<td>
+<span class="action" onclick="edit(${i})">Edit</span> |
+<span class="action" onclick="del(${i})">Delete</span>
+</td>
+</tr> ;
+invoiceTable.innerHTML+=
+<tr>
+<td>${j.id}</td>
+<td>${j.customer}</td>
+<td>${j.driver}</td>
+<td onclick="togglePayment(${i})" class="action">${j.payment}</td>
+<td>$${j.total.toFixed(2)}</td>
+<td onclick="printInv(${i})" class="action">Print</td>
+</tr> ;
+if(j.pick){
+let m=L.marker(j.pick).addTo(map)
+.bindPopup( <b>${j.customer}</b><br>${j.driver} );
+markers.push(m);
+bounds.push(j.pick);
 }
-sendBtn.addEventListener('click', ()=>{
-  const msg=document.getElementById('message').value.trim();
-  if(currentLat===null||currentLon===null) return alert("Location not ready");
-  push(chatRef,{message:msg, lat:currentLat, lon:currentLon, time:new Date().toISOString()});
-  document.getElementById('message').value="";
 });
-
-onChildAdded(chatRef, snap=>{
-  const data = snap.val();
-  const li = document.createElement('li');
-  li.textContent=(data.message||"")+" | 📍 "+(data.lat||"")+","+(data.lon||"");
-  document.getElementById('messages').appendChild(li);
-
-  if(data.lat && data.lon){
-    const m=L.circleMarker([data.lat,data.lon],{color:'purple'}).addTo(map)
-      .bindPopup(`<b>Chat Message</b><br>${data.message}<br>${data.time}`);
-    chatMarkers.push(m);
-    fitMapBounds();
-  }
-});
-
-/* ===== TOW LOCATIONS ===== */
-onValue(towRef, snap=>{
-  clearMarkers(towMarkers);
-  const data = snap.val()||{};
-  Object.values(data).forEach(loc=>{
-    if(!loc.lat||!loc.lon) return;
-    const m=L.marker([loc.lat,loc.lon]).addTo(map)
-      .bindPopup(`<b>Tow Request</b><br>${loc.address}<br>${loc.time||''}`);
-    towMarkers.push(m);
-  });
-  fitMapBounds();
-});
-
-/* ===== MAP RENDER ===== */
-function renderMap(){
-  clearMarkers(jobMarkers);
-  jobs.forEach(j=>{
-    if(j.pick){
-      const m=L.marker(j.pick).addTo(map)
-        .bindPopup(`<b>Job ID:</b> ${j.id}<br><b>Customer:</b> ${j.customer}<br><b>Driver:</b> ${j.driver}<br>
-          <b>Pickup:</b> ${j.pick}<br><b>Dropoff:</b> ${j.drop}<br><b>Status:</b> ${j.status}<br>
-          <b>Payment:</b> ${j.payment}`);
-      jobMarkers.push(m);
-    }
-  });
-  fitMapBounds();
+/* 🔥 FIX: FORCE FULL MAP REDRAW */
+setTimeout(()=>{
+map.invalidateSize(true);
+tileLayer.redraw();
+if(bounds.length) map.fitBounds(bounds,{padding:[50,50]});
+},200);
 }
-
-function fitMapBounds(){
-  const allMarkers=[...jobMarkers,...towMarkers,...chatMarkers];
-  if(allMarkers.length){
-    const group=L.featureGroup(allMarkers);
-    map.fitBounds(group.getBounds().pad(0.2));
-  }
+/* TAB FIX */
+window.openTab=id=>{
+document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
+document.getElementById(id).style.display='block';
+if(id==="mapTab"){
+setTimeout(()=>{
+map.invalidateSize(true);
+3/20/26, 3:13 PM Towing Dashboard Integration
+https://chatgpt.com/c/69bda0c1-b088-8327-bbdd-d4adf63feddf 5/6
+tileLayer.redraw();
+},300);
 }
-
-/* ===== TABS ===== */
-function openTab(id){
-  document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
-  document.getElementById(id).style.display='block';
-  setTimeout(()=>map.invalidateSize(true),300);
-}
-
-/* ===== ATTACH TABS TO BUTTONS ===== */
-document.getElementById('btnMap').addEventListener('click', ()=>openTab('mapTab'));
-document.getElementById('btnJobs').addEventListener('click', ()=>openTab('jobsTab'));
-document.getElementById('btnChat').addEventListener('click', ()=>openTab('chatTab'));
-
-/* ===== SHOW MAP BY DEFAULT ===== */
-openTab('mapTab');
-
+};
+openTab('jobs');
 </script>
 </body>
 </html>
