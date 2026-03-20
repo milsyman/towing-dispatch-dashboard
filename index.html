@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>M&S Towing Real-Time Dashboard</title>
+<title>M&S Towing Unified Dashboard</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
 body {margin:0; font-family:Arial; background:#f4f6f8;}
@@ -22,18 +22,18 @@ th, td {border:1px solid #ccc; padding:6px;}
 #legend div{margin:5px 0;}
 ul {list-style:none; padding:0;}
 li {background:rgba(0,0,0,0.2); padding:5px; margin:3px 0; border-radius:5px; word-wrap:break-word;}
+input, button {margin:5px 0; padding:8px;}
 </style>
 </head>
 <body>
 
-<header><h1>M&S Towing Real-Time Dashboard</h1></header>
+<header><h1>M&S Towing Unified Dashboard</h1></header>
 <nav>
   <button onclick="openTab('mapTab')">Map</button>
   <button onclick="openTab('jobsTab')">Jobs</button>
   <button onclick="openTab('chatTab')">Driver Chat</button>
 </nav>
 
-<!-- MAP TAB -->
 <div id="mapTab" class="tab">
   <div id="map"></div>
   <div id="legend">
@@ -43,7 +43,6 @@ li {background:rgba(0,0,0,0.2); padding:5px; margin:3px 0; border-radius:5px; wo
   </div>
 </div>
 
-<!-- JOBS TAB -->
 <div id="jobsTab" class="tab">
   <h2>Dispatch Jobs</h2>
   <form id="jobForm">
@@ -61,7 +60,6 @@ li {background:rgba(0,0,0,0.2); padding:5px; margin:3px 0; border-radius:5px; wo
   </table>
 </div>
 
-<!-- CHAT TAB -->
 <div id="chatTab" class="tab">
   <h2>Driver Chat</h2>
   <input id="message" placeholder="Type your message here" style="width:70%">
@@ -73,7 +71,7 @@ li {background:rgba(0,0,0,0.2); padding:5px; margin:3px 0; border-radius:5px; wo
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onValue, onChildAdded, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-/* ===== FIREBASE CONFIGS ===== */
+/* ===== SINGLE FIREBASE PROJECT CONFIG ===== */
 const dispatchApp = initializeApp({
   apiKey: "AIzaSyB9mtP2Emr_Dxbpe_x5BO-7edan_vG8Euo",
   authDomain: "dispatch-app-fdcf6.firebaseapp.com",
@@ -83,45 +81,28 @@ const dispatchApp = initializeApp({
   messagingSenderId: "460899401434",
   appId: "1:460899401434:web:29dc46e13aba533319afe3"
 }, "dispatchApp");
-const dbDispatch = getDatabase(dispatchApp);
-const jobsRef = ref(dbDispatch, "jobs");
 
-const chatApp = initializeApp({
-  apiKey: "AIzaSyC4RwUjxX9x118vXdlfr6UEZGC0rwL6-HE",
-  authDomain: "chat-1cb54.firebaseapp.com",
-  databaseURL: "https://chat-1cb54-default-rtdb.firebaseio.com/",
-  projectId: "chat-1cb54",
-  storageBucket: "chat-1cb54.firebasestorage.app",
-  messagingSenderId: "353414353280",
-  appId: "1:353414353280:web:e1c5c865ce0abfd9c0b165"
-}, "chatApp");
-const dbChat = getDatabase(chatApp);
-const messagesRef = ref(dbChat, 'messages');
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-const towApp = initializeApp({
-  apiKey: "AIzaSyAgsss6WKIPj_dfjWC_W3oViKF4iTPbw6Q",
-  authDomain: "ms-towing.firebaseapp.com",
-  databaseURL: "https://ms-towing-default-rtdb.firebaseio.com/",
-  projectId: "ms-towing",
-  storageBucket: "ms-towing.firebasestorage.app",
-  messagingSenderId: "983593521689",
-  appId: "1:983593521689:web:2d37b648199b684cf99088"
-}, "towApp");
-const dbTow = getDatabase(towApp);
-const towRef = ref(dbTow, 'locations');
+/* ===== DATABASE REFERENCES ===== */
+const jobsRef = ref(db, "jobs");
+const messagesRef = ref(db, "chat");
+const towRef = ref(db, "locations");
 
 /* ===== LEAFLET MAP ===== */
 const map = L.map('map').setView([39,-98],4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 let jobMarkers=[], towMarkers=[], chatMarkers=[];
-
 function clearMarkers(arr){ arr.forEach(m=>map.removeLayer(m)); arr.length=0; }
 
-/* ===== GEO HELPERS ===== */
+/* ===== GEO HELPER ===== */
 async function geo(address){
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-  const data = await res.json();
-  return data.length?[+data[0].lat,+data[0].lon]:null;
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    return data.length?[+data[0].lat,+data[0].lon]:null;
+  }catch{return null;}
 }
 
 /* ===== JOBS LOGIC ===== */
@@ -145,7 +126,7 @@ document.getElementById('jobForm').onsubmit = async e=>{
 
 onValue(jobsRef, snap=>{
   jobs=[]; snap.forEach(c=>jobs.push({key:c.key,...c.val()}));
-  renderJobsTable(); renderMap(); // live update
+  renderJobsTable(); renderMap();
 });
 
 function renderJobsTable(){
@@ -160,9 +141,9 @@ function renderJobsTable(){
 
 window.editJob = i=>{
   let s=prompt("Status: EnRoute / Hooked / Completed",jobs[i].status);
-  if(s) update(ref(dbDispatch,"jobs/"+jobs[i].key),{status:s});
+  if(s) update(ref(db,"jobs/"+jobs[i].key),{status:s});
 };
-window.delJob = i=>remove(ref(dbDispatch,"jobs/"+jobs[i].key));
+window.delJob = i=>remove(ref(db,"jobs/"+jobs[i].key));
 
 /* ===== DRIVER CHAT ===== */
 let currentAddress=null;
@@ -204,14 +185,14 @@ onValue(towRef, snap=>{
   const data = snap.val()||{};
   Object.values(data).forEach(loc=>{
     if(!loc.lat||!loc.lon) return;
-    const m=L.marker([Number(loc.lat),Number(loc.lon)],{icon:null}).addTo(map)
+    const m=L.marker([Number(loc.lat),Number(loc.lon)]).addTo(map)
       .bindPopup(`<b>Tow Request</b><br>${loc.address}<br>${loc.time||''}`);
     towMarkers.push(m);
   });
   fitMapBounds();
 });
 
-/* ===== RENDER MAP ===== */
+/* ===== MAP RENDER ===== */
 function renderMap(){
   clearMarkers(jobMarkers);
   jobs.forEach(j=>{
