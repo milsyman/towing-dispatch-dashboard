@@ -29,10 +29,35 @@ th, td {border:1px solid #ccc; padding:6px; text-align:left; white-space:nowrap;
 .card {background:white; padding:15px; margin:10px 0; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
 .action {color:#2563eb; cursor:pointer; text-decoration:underline;}
 @media(max-width:700px){nav button{font-size:14px;}}
+
+/* --- LOGIN MODAL --- */
+#loginScreen {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(31,41,55,0.95); color:white;
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  z-index:9999;
+}
+#loginScreen input {
+  padding:10px; font-size:18px; width:180px; text-align:center;
+  border-radius:4px; border:none; margin:10px 0;
+}
+#loginScreen button {
+  background:#2563eb; color:white; padding:10px 20px; font-size:16px; border:none; border-radius:4px;
+}
+#loginScreen button:hover {background:#1e40af;}
+#pinError {color:#f87171; margin-top:5px; display:none;}
 </style>
 </head>
 
 <body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <h2>Enter PIN to Access M&S Towing</h2>
+  <input id="pinInput" type="password" placeholder="Enter PIN">
+  <button onclick="checkPin()">Enter</button>
+  <p id="pinError">Incorrect PIN. Try again.</p>
+</div>
 
 <header>
 <h1>M&S Towing</h1>
@@ -100,10 +125,7 @@ th, td {border:1px solid #ccc; padding:6px; text-align:left; white-space:nowrap;
 <div id="map"></div>
 </div>
 
-<!-- LEAFLET -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 
@@ -315,6 +337,19 @@ return R*2*Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
 
 // --- INITIAL RENDER ---
 render();
+
+// --- PIN LOGIN FUNCTION ---
+function checkPin(){
+  const pin = document.getElementById('pinInput').value;
+  if(pin === "21196"){
+    document.getElementById('loginScreen').style.display = 'none';
+  } else {
+    document.getElementById('pinError').style.display = 'block';
+  }
+}
+document.getElementById('pinInput').addEventListener('keypress', function(e){
+  if(e.key === 'Enter') checkPin();
+});
 </script>
 
 </body>
